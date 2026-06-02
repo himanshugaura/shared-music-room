@@ -1,0 +1,63 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+build
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+.idea
+
+# Temporary files
+tmp
+temp
+.tmp
+
+# Cache
+.cache
+
+# pnpm store (only if inside project)
+.pnpm-store
+
+# Turbo
+.turbo
+
+# Next.js (if monorepo)
+.next
+
+# Uploads (if storing locally)
+uploads
+public/uploads
