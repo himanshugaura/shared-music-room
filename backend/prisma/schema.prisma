@@ -1,0 +1,155 @@
+generator client {
+provider = "prisma-client-js"
+}
+
+datasource db {
+provider = "postgresql"
+}
+
+enum Provider {
+local
+google
+}
+
+enum Visibility {
+public
+private
+}
+
+enum VoteType {
+up
+down
+}
+
+model User {
+id              String      @id @default(cuid())
+username        String      @unique
+name            String
+email           String      @unique
+password        String?
+provider        Provider    @default(local)
+googleId        String?     @unique
+isVerified      Boolean     @default(false)
+avatarUrl       String?
+avatarPublicId  String?
+
+createdAt       DateTime    @default(now())
+updatedAt       DateTime    @updatedAt
+
+ownedRooms      Room[]
+adminRooms      RoomAdmin[]
+memberRooms     RoomMember[]
+addedSongs      QueueSong[]
+votes           SongVote[]
+}
+
+model Room {
+id              String      @id @default(cuid())
+roomCode        String      @unique
+
+name            String
+description     String?
+visibility      Visibility  @default(public)
+
+ownerId         String
+owner           User        @relation(fields: [ownerId], references: [id])
+
+createdAt       DateTime    @default(now())
+updatedAt       DateTime    @updatedAt
+
+admins          RoomAdmin[]
+members         RoomMember[]
+queue           MusicQueue?
+
+@@index([ownerId])
+@@index([visibility])
+}
+
+model RoomAdmin {
+roomId          String
+userId          String
+
+room            Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@id([roomId, userId])
+@@index([userId])
+}
+
+model RoomMember {
+roomId          String
+userId          String
+joinedAt        DateTime    @default(now())
+
+room            Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@id([roomId, userId])
+@@index([userId])
+}
+
+model MusicQueue {
+id                  String       @id @default(cuid())
+
+roomId              String       @unique
+room                Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+currentQueueSongId  String?
+currentPositionMs   Int          @default(0)
+
+isPlaying           Boolean      @default(false)
+shuffleEnabled      Boolean      @default(false)
+
+createdAt           DateTime     @default(now())
+updatedAt           DateTime     @updatedAt
+
+songs               QueueSong[]
+
+@@index([roomId])
+}
+
+model QueueSong {
+id                  String       @id @default(cuid())
+
+queueId             String
+queue               MusicQueue   @relation(fields: [queueId], references: [id], onDelete: Cascade)
+
+youtubeVideoId      String
+
+title               String
+thumbnail           String?
+
+durationMs          Int
+
+position            Int
+
+upVotes             Int          @default(0)
+downVotes           Int          @default(0)
+voteScore           Int          @default(0)
+
+addedById           String
+addedBy             User         @relation(fields: [addedById], references: [id], onDelete: Cascade)
+
+addedAt             DateTime     @default(now())
+
+votes               SongVote[]
+
+@@index([queueId, position])
+@@index([queueId, voteScore])
+@@index([addedById])
+}
+
+model SongVote {
+queueSongId         String
+userId              String
+
+voteType            VoteType
+
+createdAt           DateTime     @default(now())
+
+queueSong           QueueSong    @relation(fields: [queueSongId], references: [id], onDelete: Cascade)
+user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+@@id([queueSongId, userId])
+@@index([userId])
+}
