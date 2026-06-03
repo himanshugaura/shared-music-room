@@ -96,7 +96,7 @@ room                Room         @relation(fields: [roomId], references: [id], o
 
 currentQueueSongId  String?
 currentPositionMs   Int          @default(0)
-
+playbackStartedAt DateTime?
 isPlaying           Boolean      @default(false)
 shuffleEnabled      Boolean      @default(false)
 
