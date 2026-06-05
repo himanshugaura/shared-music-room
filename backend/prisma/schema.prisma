@@ -32,7 +32,7 @@ googleId        String?     @unique
 isVerified      Boolean     @default(false)
 avatarUrl       String?
 avatarPublicId  String?
-
+refreshToken    String?
 createdAt       DateTime    @default(now())
 updatedAt       DateTime    @updatedAt
 
