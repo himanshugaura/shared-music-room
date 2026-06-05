@@ -29,8 +29,7 @@
 
     /* Output */
     "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
+    "declaration": false,
 
     /* Performance */
     "skipLibCheck": true,
