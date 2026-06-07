@@ -1,11 +1,11 @@
-import { User } from "@prisma/client";
+import type { AuthUser } from './auth.types.js';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: User;
+      user?: AuthUser;
     }
   }
 }
 
-export {};
+export type { AuthUser };

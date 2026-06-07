@@ -1,342 +1,118 @@
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiResponse } from "../utils/apiResponse.js";
-import { ApiError } from "../utils/apiError.js";
-import argon from "argon2";
-import { prisma } from "../config/prisma.js";
+import type { Request, Response, CookieOptions } from 'express';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
 import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyAccessToken,
-  verifyRefreshToken,
-} from "../utils/jwt.js";
-import { OAuth2Client } from "google-auth-library/build/src/auth/oauth2client.js";
-import { verificationEmailSender } from "../utils/sendMail.js";
+  googleAuthUser,
+  loginUser,
+  logoutUser,
+  refreshTokens,
+  registerUser,
+  sendVerificationEmailToUser,
+  verifyEmailToken,
+} from '../services/auth.services.js';
+import type { RegisterBody, LoginBody, GoogleAuthBody } from '../validations/auth.validations.js';
 
-export const register = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
+const ACCESS_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: IS_PRODUCTION,
+  sameSite: 'lax',
+  maxAge: 15 * 60 * 1000,
+  path: '/',
+};
 
-  if (existingUser) {
-    throw new ApiError(
-      409,
-      existingUser.provider === "google"
-        ? "Account already exists. Continue with Google."
-        : "Account already exists.",
-    );
-  }
+const REFRESH_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: IS_PRODUCTION,
+  sameSite: 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/',
+};
 
-  const hashedPassword = await argon.hash(password);
+const CLEAR_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: IS_PRODUCTION,
+  sameSite: 'lax',
+  path: '/',
+};
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-    },
-  });
+const setAuthCookies = (res: Response, accessToken: string, refreshToken: string): void => {
+  res.cookie('accessToken', accessToken, ACCESS_COOKIE_OPTIONS);
+  res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+};
 
-  await verificationEmailSender({
-    to: user.email,
-    url: `${process.env.FRONTEND_URL}/verify-email?token=${generateAccessToken({ userId: user.id })}`,
-  });
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body as RegisterBody;
 
-  const sanitizedUser = {
-    id: user.id,
-    email: user.email,
-  };
+  const user = await registerUser(email, password);
 
-  return new ApiResponse(
-    201,
-    sanitizedUser,
-    "User registered successfully",
-  ).send(res);
+  return new ApiResponse(201, user, 'User registered successfully').send(res);
 });
 
-export const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+export const login = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body as LoginBody;
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
+  const { accessToken, refreshToken, user } = await loginUser(email, password);
 
-  if (!user) {
-    throw new ApiError(401, "Invalid credentials");
-  }
+  setAuthCookies(res, accessToken, refreshToken);
 
-  if (user.provider === "google") {
-    throw new ApiError(401, "This account uses Google sign-in");
-  }
-
-  const isPasswordValid = await argon.verify(user.password!, password);
-
-  if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid credentials");
-  }
-
-  const accessToken = generateAccessToken({ userId: user.id });
-  const refreshToken = generateRefreshToken({ userId: user.id });
-
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 15 *  60 * 1000,
-    path: "/",
-  });
-
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: "/",
-  });
-
-  const hashedRefreshToken = await argon.hash(refreshToken);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { refreshToken : hashedRefreshToken },
-  });
-
-  const sanitizedUser = {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    avatarUrl: user.avatarUrl,
-    isVerified: user.isVerified,
-  };
-
-  return new ApiResponse(
-    200,
-    sanitizedUser,
-    "User logged in successfully",
-  ).send(res);
+  return new ApiResponse(200, user, 'User logged in successfully').send(res);
 });
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
+  const { credential } = req.body as GoogleAuthBody;
 
-export const googleAuth = asyncHandler(async (req, res) => {
-  const { credential } = req.body;
+  const { accessToken, refreshToken, user } = await googleAuthUser(credential);
 
-  if (!credential) {
-    throw new ApiError(400, "Google credential is required");
-  }
+  setAuthCookies(res, accessToken, refreshToken);
 
-  const ticket = await client.verifyIdToken({
-    idToken: credential,
-    audience: process.env.GOOGLE_CLIENT_ID!,
-  });
+  return new ApiResponse(200, user, 'User authenticated with Google successfully').send(res);
+});
 
-  const payload = ticket.getPayload();
+export const logout = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
 
-  if (!payload || !payload.email || !payload.sub) {
-    throw new ApiError(401, "Invalid Google token");
-  }
-
-  let user = await prisma.user.findUnique({
-    where: {
-      email: payload.email,
-    },
-  });
-
-  if (user && user.provider !== "google") {
-    throw new ApiError(409, "Account already exists with email/password");
-  }
-
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email: payload.email,
-        name: payload.name ?? "",
-        googleId: payload.sub,
-        avatarUrl: payload.picture ?? null,
-        provider: "google",
-        isVerified: true,
-      },
-    });
-  }
-
-  const accessToken = generateAccessToken({
-    userId: user.id,
-  });
-
-  const refreshToken = generateRefreshToken({
-    userId: user.id,
-  });
-
-  const hashedRefreshToken = await argon.hash(refreshToken);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { refreshToken : hashedRefreshToken },
-  });
+  if (!userId) throw new ApiError(401, 'Unauthorized');
 
   res
-    .cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 15 * 60 * 1000,
-    })
-    .cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    .clearCookie('accessToken', CLEAR_COOKIE_OPTIONS)
+    .clearCookie('refreshToken', CLEAR_COOKIE_OPTIONS);
 
-  const sanitizedUser = {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    avatarUrl: user.avatarUrl,
-    isVerified: user.isVerified,
-  };
-  return new ApiResponse(
-    200,
-    sanitizedUser,
-    "User authenticated with Google successfully",
-  ).send(res);
+  await logoutUser(userId);
+
+  return new ApiResponse(200, null, 'User logged out successfully').send(res);
 });
 
-export const logout = asyncHandler(async (req, res) => {
-  res
-    .clearCookie("accessToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    })
-    .clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+export const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
+  const incomingRefreshToken = req.cookies?.refreshToken as string | undefined;
 
-    await prisma.user.update({
-    where: { id: req.user!.id },
-    data: { refreshToken: null },
-  });
-  return new ApiResponse(200, null, "User logged out successfully").send(res);
+  if (!incomingRefreshToken) throw new ApiError(401, 'Refresh token missing');
+
+  const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken);
+
+  setAuthCookies(res, newAccessToken, newRefreshToken);
+
+  return new ApiResponse(200, null, 'Tokens refreshed successfully').send(res);
 });
 
-export const refreshAccessToken = asyncHandler(async (req, res) => {
-  const incomingRefreshToken = req.cookies.refreshToken;
+export const sendVerificationEmail = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
 
-  if (!incomingRefreshToken) {
-    throw new ApiError(401, "Unauthorized");
-  }
+  if (!userId) throw new ApiError(401, 'Unauthorized');
 
-  const payload = verifyRefreshToken(incomingRefreshToken);
+  await sendVerificationEmailToUser(userId);
 
-  if (!payload) {
-    throw new ApiError(401, "Unauthorized");
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-  });
-
-  if (!user) {
-    throw new ApiError(401, "User not found");
-  }
-
-  if (!user.refreshToken) {
-  throw new ApiError(
-    401,
-    "Unauthorized"
-  );
-}
-
-const isValidRefreshToken =
-  await argon.verify(
-    user.refreshToken,
-    incomingRefreshToken
-  );
-
-if (!isValidRefreshToken) {
-  throw new ApiError(
-    401,
-    "Unauthorized"
-  );
-}
-
-  const newAccessToken = generateAccessToken({ userId: user.id });
-  const newRefreshToken = generateRefreshToken({ userId: user.id });
-  
-  const hashedNewRefreshToken = await argon.hash(newRefreshToken);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { refreshToken : hashedNewRefreshToken },
-  });
-
-  res.cookie("accessToken", newAccessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 15 *  60 * 1000,
-  });
-
-  res.cookie("refreshToken", newRefreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-
-  return new ApiResponse(
-    200,
-    null,
-    "Tokens refreshed successfully",
-  ).send(res);
+  return new ApiResponse(200, null, 'Verification email sent').send(res);
 });
 
+export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
+  const { token } = req.query as { token?: string };
 
-export const sendVerificationEmail = asyncHandler(async (req, res) => {
-  const userId = req.body;
+  if (!token) throw new ApiError(400, 'Verification token is required');
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  }); 
+  await verifyEmailToken(token);
 
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  if (user.isVerified) {
-    throw new ApiError(400, "Email is already verified");
-  }
-
-  const verificationToken = generateAccessToken({ userId: user.id });
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;    
-  await verificationEmailSender({
-    to: user.email,
-    url: verificationUrl,
-  }); 
-  return new ApiResponse(200, null, "Verification email sent").send(res);
-});
-  
-
-export const verifyEmail = asyncHandler(async (req, res) => {
-  const { token } = req.query;
-  if (typeof token !== "string") {
-    throw new ApiError(400, "Verification token is required");
-  } 
-  const payload = verifyAccessToken(token);
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-  });
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-  if (user.isVerified) {
-    throw new ApiError(400, "Email is already verified");
-  } 
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { isVerified: true },
-  });
-  return new ApiResponse(200, null, "Email verified successfully").send(res);
+  return new ApiResponse(200, null, 'Email verified successfully').send(res);
 });

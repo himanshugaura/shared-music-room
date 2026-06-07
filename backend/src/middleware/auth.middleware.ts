@@ -1,51 +1,33 @@
-import type { RequestHandler } from "express";
-import { prisma } from "../config/prisma.js";
-import { ApiError } from "../utils/apiError.js";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { verifyAccessToken } from "../utils/jwt.js";
+import type { RequestHandler } from 'express';
+import { ApiError } from '../utils/apiError.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { verifyAccessToken } from '../utils/jwt.js';
+import { findUserProfileById } from '../repositories/user.repository.js';
 
-export const authMiddleware: RequestHandler =
-  asyncHandler(async (req, res, next) => {
-    const authHeader =
-      req.headers.authorization;
+export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, next) => {
+  let token: string | undefined;
 
-    if (
-      !authHeader ||
-      !authHeader.startsWith("Bearer ")
-    ) {
-      throw new ApiError(
-        401,
-        "Unauthorized"
-      );
-    }
+  const authHeader = req.headers.authorization;
 
-    const token =
-      authHeader.split(" ")[1];
-    
-    if (!token) {
-      throw new ApiError(
-        401,
-        "Unauthorized"
-      );
-    }
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else if (req.cookies?.accessToken) {
+    token = req.cookies.accessToken as string;
+  }
 
-  const payload = verifyAccessToken(token);
+  if (!token) {
+    throw new ApiError(401, 'Unauthorized');
+  }
 
-    const user =
-      await prisma.user.findUnique({
-        where: {
-          id: payload.userId,
-        },
-      });
+  const { userId } = verifyAccessToken(token);
 
-    if (!user) {
-      throw new ApiError(
-        401,
-        "User not found"
-      );
-    }
+  const user = await findUserProfileById(userId);
 
-    req.user = user;
+  if (!user) {
+    throw new ApiError(401, 'User not found');
+  }
 
-    next();
-  });
+  req.user = user;
+
+  next();
+});
