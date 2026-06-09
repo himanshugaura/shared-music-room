@@ -1,10 +1,9 @@
 import { Router } from 'express';
 
+import { createRoom, deleteRoom, getRoomDetails,listPublicRooms } from '../controllers/room.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
 import { createRoomBodySchema } from '../validations/room.validations.js';
-
-import { createRoom, deleteRoom, listPublicRooms, getRoomDetails } from '../controllers/room.controller.js';
 
 const router = Router();
 

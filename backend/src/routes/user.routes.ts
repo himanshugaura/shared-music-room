@@ -1,14 +1,15 @@
 import { Router } from 'express';
+
+import { upload } from '../config/multer.js';
 import {
-  getProfile,
-  updateProfile,
   checkUsername,
-  getUserOwnedRooms,
+  getProfile,
   getUserJoinedRooms,
+  getUserOwnedRooms,
+  updateProfile,
 } from '../controllers/user.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
-import { upload } from '../config/multer.js';
 import { checkUsernameBodySchema, updateProfileBodySchema } from '../validations/user.validations.js';
 
 const router = Router();

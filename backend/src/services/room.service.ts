@@ -1,15 +1,16 @@
-import { customAlphabet } from "nanoid";
+import type { Room } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { ApiError } from "../utils/apiError.js";
+import { customAlphabet } from "nanoid";
+
 import {
-  createRoomRecord,
   createMusicQueueRecord,
+  createRoomRecord,
   deleteRoomById,
   findPublicRooms,
   findRoomById,
 } from "../repositories/room.repository.js";
 import type { CreateRoomInput, RoomSummary } from "../types/room.types.js";
-import type { Room } from "@prisma/client";
+import { ApiError } from "../utils/apiError.js";
 
 const ROOM_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const ROOM_CODE_LENGTH = 6;

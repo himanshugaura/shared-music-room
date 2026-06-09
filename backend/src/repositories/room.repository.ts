@@ -1,6 +1,7 @@
+import type { Prisma, Room } from "@prisma/client";
+
 import { prisma } from "../config/prisma.js";
 import type { RoomSummary } from "../types/room.types.js";
-import type { Prisma, Room } from "@prisma/client";
 
 const ROOM_SUMMARY_SELECT = {
   id: true,

@@ -17,6 +17,30 @@ export interface RegisterResponse {
   email: string;
 }
 
-export interface TokenPayload {
+export interface AccessTokenPayload {
   userId: string;
+}
+
+export interface RefreshTokenPayload {
+  userId: string;
+}
+
+export interface RegisterBody {
+  email: string;
+  password: string;
+}
+
+export interface LoginBody {
+  email: string;
+  password: string;
+}
+
+export interface GoogleAuthBody {
+  credential: string;
+}
+
+export interface AuthPayload {
+  id: string;
+  email: string;
+  isVerified: boolean;
 }

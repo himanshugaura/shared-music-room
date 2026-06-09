@@ -1,27 +1,27 @@
 import type { Request, Response } from "express";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/apiError.js";
-import { ApiResponse } from "../utils/apiResponse.js";
+
 import {
   createRoomService,
   deleteRoomService,
-  listPublicRoomsService,
   getRoomDetailsService,
-} from "../services/room.services.js";
+  listPublicRoomsService,
+} from "../services/room.service.js";
+import { ApiError } from "../utils/apiError.js";
+import { ApiResponse } from "../utils/apiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import type { CreateRoomBody } from "../validations/room.validations.js";
-import type { Visibility } from "@prisma/client";
 
 export const createRoom = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
 
-  if (!userId) throw new ApiError(401, "Unauthorized");
+  if (!userId) {throw new ApiError(401, "Unauthorized");}
 
   const { name, description, visibility } = req.body as CreateRoomBody;
 
   const room = await createRoomService({
     name,
     description: description ?? null,
-    visibility: visibility as Visibility,
+    visibility,
     userId,
   });
 

@@ -1,15 +1,15 @@
 import type { Request, Response } from 'express';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { ApiError } from '../utils/apiError.js';
-import { ApiResponse } from '../utils/apiResponse.js';
+
+import { joinRoomAsMember } from '../repositories/user.repository.js';
 import {
   checkUsernameAvailability,
+  getJoinedRooms,
+  getOwnedRooms,
   getUserProfile,
   updateUserProfile,
-  getOwnedRooms,
-  getJoinedRooms,
 } from '../services/user.service.js';
-import { joinRoomAsMember } from '../repositories/user.repository.js';
+import { ApiResponse } from '../utils/apiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const getProfile = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
@@ -25,9 +25,9 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   const { name, username } = req.body as { name?: string; username?: string };
 
   const input: import('../services/user.service.js').UpdateProfileInput = {};
-  if (name !== undefined) input.name = name;
-  if (username !== undefined) input.username = username;
-  if (req.file !== undefined) input.file = req.file;
+  if (name !== undefined) {input.name = name;}
+  if (username !== undefined) {input.username = username;}
+  if (req.file !== undefined) {input.file = req.file;}
 
   const user = await updateUserProfile(userId!, input);
 

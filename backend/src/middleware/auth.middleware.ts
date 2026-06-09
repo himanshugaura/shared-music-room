@@ -1,19 +1,16 @@
 import type { RequestHandler } from 'express';
+
+import { findUserProfileById } from '../repositories/user.repository.js';
 import { ApiError } from '../utils/apiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { verifyAccessToken } from '../utils/jwt.js';
-import { findUserProfileById } from '../repositories/user.repository.js';
 
 export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, next) => {
-  let token: string | undefined;
-
   const authHeader = req.headers.authorization;
-
-  if (authHeader?.startsWith('Bearer ')) {
-    token = authHeader.slice(7);
-  } else if (req.cookies?.accessToken) {
-    token = req.cookies.accessToken as string;
-  }
+  const token =
+    authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : (req.cookies?.accessToken as string | undefined);
 
   if (!token) {
     throw new ApiError(401, 'Unauthorized');
@@ -27,7 +24,11 @@ export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, nex
     throw new ApiError(401, 'User not found');
   }
 
-  req.user = user;
+  req.user = {
+    id: user.id,
+    email: user.email,
+    isVerified: user.isVerified,
+  };
 
   next();
 });

@@ -1,23 +1,23 @@
-import { ApiError } from '../utils/apiError.js';
-import { uploadAvatar, deleteFromCloudinary } from '../utils/cloudinary.js';
-import {
-  findUserProfileById,
-  findUserByUsername,
-  updateUserProfile as dbUpdateUserProfile,
-  findOwnedRooms,
-  findMemberRooms,
-  findAdminRooms,
-} from '../repositories/user.repository.js';
 import { findUserById } from '../repositories/auth.repository.js';
+import {
+  findAdminRooms,
+  findMemberRooms,
+  findOwnedRooms,
+  findUserByUsername,
+  findUserProfileById,
+  updateUserProfile as dbUpdateUserProfile,
+} from '../repositories/user.repository.js';
 import type { AuthUser } from '../types/auth.types.js';
 import type { JoinedRoomsResponse, RoomSummary } from '../types/room.types.js';
+import { ApiError } from '../utils/apiError.js';
+import { deleteFromCloudinary,uploadAvatar } from '../utils/cloudinary.js';
 
 export type UserProfile = AuthUser & { username: string | null; createdAt: Date };
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
   const user = await findUserProfileById(userId);
 
-  if (!user) throw new ApiError(404, 'User not found');
+  if (!user) {throw new ApiError(404, 'User not found');}
 
   return user;
 };
@@ -25,7 +25,7 @@ export const getUserProfile = async (userId: string): Promise<UserProfile> => {
 export const checkUsernameAvailability = async (username: string): Promise<void> => {
   const existing = await findUserByUsername(username);
 
-  if (existing) throw new ApiError(409, 'Username is already taken');
+  if (existing) {throw new ApiError(409, 'Username is already taken');}
 };
 
 export interface UpdateProfileInput {
@@ -40,7 +40,7 @@ export const updateUserProfile = async (
 ): Promise<UserProfile> => {
   const current = await findUserProfileById(userId);
 
-  if (!current) throw new ApiError(404, 'User not found');
+  if (!current) {throw new ApiError(404, 'User not found');}
 
   let avatarUrl: string | null = current.avatarUrl;
   let avatarPublicId: string | null = null;

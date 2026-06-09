@@ -1,7 +1,4 @@
-import type { Request, Response, CookieOptions } from 'express';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { ApiError } from '../utils/apiError.js';
-import { ApiResponse } from '../utils/apiResponse.js';
+import type { CookieOptions,Request, Response } from 'express';
 import {
   googleAuthUser,
   loginUser,
@@ -10,8 +7,12 @@ import {
   registerUser,
   sendVerificationEmailToUser,
   verifyEmailToken,
-} from '../services/auth.services.js';
-import type { RegisterBody, LoginBody, GoogleAuthBody } from '../validations/auth.validations.js';
+} from '../services/auth.service.js';
+import type { GoogleAuthBody,LoginBody, RegisterBody } from '../types/auth.types.js';
+import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { verifyRefreshToken } from '../utils/jwt.js';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
@@ -27,7 +28,7 @@ const REFRESH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: IS_PRODUCTION,
   sameSite: 'lax',
-  maxAge: 7 * 24 * 60 * 60 * 1000,
+  maxAge: 30 * 24 * 60 * 60 * 1000,
   path: '/',
 };
 
@@ -72,15 +73,19 @@ export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user?.id;
+  const refreshToken = req.cookies?.refreshToken;
 
-  if (!userId) throw new ApiError(401, 'Unauthorized');
+  if (!refreshToken) {
+    throw new ApiError(401, 'Refresh token is required');
+  }
+
+  const { sessionId } = verifyRefreshToken(refreshToken);
+
+  await logoutUser(sessionId);
 
   res
     .clearCookie('accessToken', CLEAR_COOKIE_OPTIONS)
     .clearCookie('refreshToken', CLEAR_COOKIE_OPTIONS);
-
-  await logoutUser(userId);
 
   return new ApiResponse(200, null, 'User logged out successfully').send(res);
 });
@@ -88,9 +93,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
 export const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken = req.cookies?.refreshToken as string | undefined;
 
-  if (!incomingRefreshToken) throw new ApiError(401, 'Refresh token missing');
-
-  const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken);
+  const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken!);
 
   setAuthCookies(res, newAccessToken, newRefreshToken);
 
@@ -100,9 +103,7 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
 export const sendVerificationEmail = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
 
-  if (!userId) throw new ApiError(401, 'Unauthorized');
-
-  await sendVerificationEmailToUser(userId);
+  await sendVerificationEmailToUser(userId!);
 
   return new ApiResponse(200, null, 'Verification email sent').send(res);
 });
@@ -110,7 +111,7 @@ export const sendVerificationEmail = asyncHandler(async (req: Request, res: Resp
 export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.query as { token?: string };
 
-  if (!token) throw new ApiError(400, 'Verification token is required');
+  if (!token) {throw new ApiError(400, 'Verification token is required');}
 
   await verifyEmailToken(token);
 

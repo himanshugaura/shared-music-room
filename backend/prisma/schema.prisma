@@ -22,25 +22,39 @@ down
 }
 
 model User {
-id              String      @id @default(cuid())
-username        String?      @unique
-name            String?
-email           String      @unique
-password        String?
-provider        Provider    @default(local)
-googleId        String?     @unique
-isVerified      Boolean     @default(false)
-avatarUrl       String?
-avatarPublicId  String?
-refreshToken    String?
-createdAt       DateTime    @default(now())
-updatedAt       DateTime    @updatedAt
+  id             String           @id @default(cuid())
+  username       String?          @unique
+  name           String?
+  email          String           @unique
+  password       String?
+  provider       Provider         @default(local)
+  googleId       String?          @unique
+  isVerified     Boolean          @default(false)
+  avatarUrl      String?
+  avatarPublicId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-ownedRooms      Room[]
-adminRooms      RoomAdmin[]
-memberRooms     RoomMember[]
-addedSongs      QueueSong[]
-votes           SongVote[]
+  refreshSessions RefreshSession[]
+
+  ownedRooms     Room[]
+  adminRooms     RoomAdmin[]
+  memberRooms    RoomMember[]
+  addedSongs     QueueSong[]
+  votes          SongVote[]
+}
+
+model RefreshSession {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshToken     String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Room {

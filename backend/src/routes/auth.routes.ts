@@ -1,16 +1,17 @@
 import { Router } from 'express';
+
 import {
-  register,
-  login,
   googleAuth,
+  login,
   logout,
   refreshAccessToken,
+  register,
   sendVerificationEmail,
   verifyEmail,
 } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
-import { registerBodySchema, loginBodySchema, googleAuthBodySchema } from '../validations/auth.validations.js';
+import { googleAuthBodySchema,loginBodySchema, registerBodySchema } from '../validations/auth.validations.js';
 
 const router = Router();
 

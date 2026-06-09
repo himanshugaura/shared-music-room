@@ -1,10 +1,12 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
+
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express from 'express';
+
 import { connectDB } from './config/db.js';
-import { errorHandler } from './utils/errorHandler.js';
 import apiRouter from './routes/index.js';
+import { errorHandler } from './utils/errorHandler.js';
 
 
 const app = express();

@@ -1,90 +1,42 @@
-import jwt from "jsonwebtoken";
-import { ApiError } from "./apiError.js";
+import jwt from 'jsonwebtoken';
 
-export interface TokenPayload {
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET!;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
+const EMAIL_SECRET = process.env.JWT_EMAIL_SECRET || ACCESS_SECRET;
+
+const ACCESS_TOKEN_EXPIRES_IN = '15m';
+const REFRESH_TOKEN_EXPIRES_IN = '30d';
+const EMAIL_TOKEN_EXPIRES_IN = '1d';
+
+export type AccessTokenPayload = {
   userId: string;
-}
-
-export const generateAccessToken = (
-  payload: TokenPayload
-): string => {
-  return jwt.sign(
-    payload,
-    process.env.ACCESS_TOKEN_SECRET!,
-    {
-      expiresIn: "1h",
-    }
-  );
 };
 
-export const generateRefreshToken = (
-  payload: TokenPayload
-): string => {
-  return jwt.sign(
-    payload,
-    process.env.REFRESH_TOKEN_SECRET!,
-    {
-      expiresIn: "7d",
-    }
-  );
+export type RefreshTokenPayload = {
+  userId: string;
+  sessionId: string;
 };
 
-export const verifyAccessToken = (
-  token: string
-): TokenPayload => {
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.ACCESS_TOKEN_SECRET!
-    );
-
-    if (
-      typeof decoded === "string" ||
-      !("userId" in decoded)
-    ) {
-      throw new ApiError(
-        401,
-        "Invalid access token"
-      );
-    }
-
-    return {
-      userId: decoded.userId,
-    };
-  } catch {
-    throw new ApiError(
-      401,
-      "Access token expired or invalid"
-    );
-  }
+export const generateAccessToken = (payload: AccessTokenPayload): string => {
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
 };
 
-export const verifyRefreshToken = (
-  token: string
-): TokenPayload => {
-  try {
-    const decoded = jwt.verify(
-      token,
-      process.env.REFRESH_TOKEN_SECRET!
-    );
+export const generateRefreshToken = (payload: RefreshTokenPayload): string => {
+  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+};
 
-    if (
-      typeof decoded === "string" ||
-      !("userId" in decoded)
-    ) {
-      throw new ApiError(
-        401,
-        "Invalid refresh token"
-      );
-    }
+export const verifyAccessToken = (token: string): AccessTokenPayload => {
+  return jwt.verify(token, ACCESS_SECRET) as AccessTokenPayload;
+};
 
-    return {
-      userId: decoded.userId,
-    };
-  } catch {
-    throw new ApiError(
-      401,
-      "Refresh token expired or invalid"
-    );
-  }
+export const verifyRefreshToken = (token: string): RefreshTokenPayload => {
+  return jwt.verify(token, REFRESH_SECRET) as RefreshTokenPayload;
+};
+
+export const generateEmailVerificationToken = (payload: AccessTokenPayload): string => {
+  return jwt.sign(payload, EMAIL_SECRET, { expiresIn: EMAIL_TOKEN_EXPIRES_IN });
+};
+
+export const verifyEmailVerificationToken = (token: string): AccessTokenPayload => {
+  return jwt.verify(token, EMAIL_SECRET) as AccessTokenPayload;
 };

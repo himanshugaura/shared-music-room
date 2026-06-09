@@ -1,6 +1,7 @@
+import type { Prisma, User } from '@prisma/client';
+
 import { prisma } from '../config/prisma.js';
 import type { AuthUser } from '../types/auth.types.js';
-import type { Prisma, User } from '@prisma/client';
 import type { RoomSummary } from '../types/room.types.js';
 
 const USER_PROFILE_SELECT = {

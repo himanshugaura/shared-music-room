@@ -1,7 +1,7 @@
 import type {
+  NextFunction,
   Request,
   Response,
-  NextFunction,
 } from "express";
 
 import { ApiError } from "../utils/apiError.js";
