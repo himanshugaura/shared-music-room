@@ -1,4 +1,4 @@
-import type { Prisma, Room } from "@prisma/client";
+import type { MusicQueue, Prisma, Room } from "@prisma/client";
 
 import { prisma } from "../config/prisma.js";
 import type { RoomSummary } from "../types/room.types.js";
@@ -15,12 +15,6 @@ export const createRoomRecord = async (
   data: Prisma.RoomCreateInput,
 ): Promise<Room> => {
   return prisma.room.create({ data });
-};
-
-export const createMusicQueueRecord = async (roomId: string): Promise<void> => {
-  await prisma.musicQueue.create({
-    data: { roomId },
-  });
 };
 
 export const deleteRoomById = async (roomId: string): Promise<Room> => {
@@ -51,18 +45,6 @@ export const findRoomById = async (roomId: string): Promise<Room | null> => {
           avatarUrl: true,
         },
       },
-      admins: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              username: true,
-              name: true,
-              avatarUrl: true,
-            },
-          },
-        },
-      },
       members: {
         include: {
           user: {
@@ -76,5 +58,28 @@ export const findRoomById = async (roomId: string): Promise<Room | null> => {
         },
       },
     },
+  });
+};
+
+export const findRoomByCode = async (roomCode: string): Promise<Pick<Room, 'id'> | null> => {
+  return prisma.room.findUnique({
+    where: { roomCode },
+    select: { id: true },
+  });
+};
+
+export const findRoomExistsById = async (roomId: string): Promise<Pick<Room, 'id'> | null> => {
+  return prisma.room.findUnique({
+    where: { id: roomId },
+    select: { id: true },
+  });
+};
+
+export const findRoomOwnerById = async (
+  roomId: string,
+): Promise<Pick<Room, 'id' | 'ownerId'> | null> => {
+  return prisma.room.findUnique({
+    where: { id: roomId },
+    select: { id: true, ownerId: true },
   });
 };

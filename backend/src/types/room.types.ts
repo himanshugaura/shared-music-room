@@ -5,6 +5,7 @@ export interface CreateRoomInput {
   description?: string | null;
   visibility: Visibility;
   userId: string;
+  shuffleEnabled?: boolean;
 }
 
 export interface RoomSummary {
@@ -17,5 +18,4 @@ export interface RoomSummary {
 
 export interface JoinedRoomsResponse {
   member: RoomSummary[];
-  admin: RoomSummary[];
 }

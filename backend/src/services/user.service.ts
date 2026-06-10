@@ -1,6 +1,6 @@
-import { findUserById } from '../repositories/auth.repository.js';
+import { findRoomByCode } from '../repositories/room.repository.js';
+import { findRoomMember, joinRoomAsMember } from '../repositories/user.repository.js';
 import {
-  findAdminRooms,
   findMemberRooms,
   findOwnedRooms,
   findUserByUsername,
@@ -10,7 +10,8 @@ import {
 import type { AuthUser } from '../types/auth.types.js';
 import type { JoinedRoomsResponse, RoomSummary } from '../types/room.types.js';
 import { ApiError } from '../utils/apiError.js';
-import { deleteFromCloudinary,uploadAvatar } from '../utils/cloudinary.js';
+import { deleteFromCloudinary, uploadAvatar } from '../utils/cloudinary.js';
+import { findUserById } from '../repositories/auth.repository.js';
 
 export type UserProfile = AuthUser & { username: string | null; createdAt: Date };
 
@@ -73,21 +74,22 @@ export const getOwnedRooms = async (userId: string): Promise<RoomSummary[]> => {
 };
 
 export const getJoinedRooms = async (userId: string): Promise<JoinedRoomsResponse> => {
-  const [member, admin] = await Promise.all([
-    findMemberRooms(userId),
-    findAdminRooms(userId),
-  ]);
-
-  return { member, admin };
+  const member = await findMemberRooms(userId);
+  return { member };
 };
 
-export const joinRoomAsMember = async (roomId: string, userId: string): Promise<void> => {
+export const joinRoom = async (roomId: string, userId: string): Promise<void> => {
+  const existing = await findRoomMember(roomId, userId);
+  if (existing) {throw new ApiError(409, 'You are already a member of this room');}
   await joinRoomAsMember(roomId, userId);
 };
 
-export const joinRoomAsMemberByCode = async (roomCode: string, userId: string): Promise<void> => {
+export const joinRoomByCode = async (roomCode: string, userId: string): Promise<void> => {
+  const room = await findRoomByCode(roomCode);
+  if (!room) {throw new ApiError(404, 'Room not found');}
 
-  joinRoomAsMemberByCode(roomCode, userId);
+  const existing = await findRoomMember(room.id, userId);
+  if (existing) {throw new ApiError(409, 'You are already a member of this room');}
+
+  await joinRoomAsMember(room.id, userId);
 };
-  
-

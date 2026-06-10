@@ -1,14 +1,15 @@
 import 'dotenv/config';
 
+import { createServer } from 'http';
+
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 
 import { connectDB } from './config/db.js';
 import apiRouter from './routes/index.js';
+import { initializeSocket } from './socket/index.js';
 import { errorHandler } from './utils/errorHandler.js';
-
-
 const app = express();
 
 app.use(
@@ -31,14 +32,18 @@ const PORT = Number(process.env.PORT) || 5000;
 const startServer = async (): Promise<void> => {
   await connectDB();
 
-  const server = app.listen(PORT, () => {
+  const httpServer = createServer(app);
+
+  initializeSocket(httpServer);
+
+  httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
   });
 
   const shutdown = (signal: string) => {
     console.log(`\n${signal} received — shutting down gracefully`);
-    server.close(() => {
+    httpServer.close(() => {
       console.log('HTTP server closed');
       process.exit(0);
     });

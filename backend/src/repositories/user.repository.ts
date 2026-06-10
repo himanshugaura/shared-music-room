@@ -56,14 +56,6 @@ export const findMemberRooms = async (userId: string): Promise<RoomSummary[]> =>
   });
 };
 
-export const findAdminRooms = async (userId: string): Promise<RoomSummary[]> => {
-  return prisma.room.findMany({
-    where: { admins: { some: { userId } } },
-    select: ROOM_SUMMARY_SELECT,
-    orderBy: { createdAt: 'desc' },
-  });
-};
-
 export const updateUserProfile = async (
   id: string,
   data: Prisma.UserUpdateInput,
@@ -79,12 +71,14 @@ export const joinRoomAsMember = async (roomId: string, userId: string): Promise<
         userId,
       },
     });
-}
+};
 
-
-export const joinRoomAsAdminByCode = async (roomCode: string, userId: string): Promise<void> => {
- await prisma.room.findUnique({
-    where: { roomCode },
-    select: { id: true },
+export const findRoomMember = async (
+  roomId: string,
+  userId: string,
+): Promise<{ roomId: string; userId: string } | null> => {
+  return prisma.roomMember.findUnique({
+    where: { roomId_userId: { roomId, userId } },
+    select: { roomId: true, userId: true },
   });
-}
+};

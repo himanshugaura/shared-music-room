@@ -1,4 +1,4 @@
-import type { Prisma, RefreshSession,User } from '@prisma/client';
+import type { Prisma, RefreshSession, User } from '@prisma/client';
 
 import { prisma } from '../config/prisma.js';
 
@@ -27,15 +27,20 @@ export const createRefreshSession = async (data: {
   refreshToken: string;
   expiresAt: Date;
 }): Promise<RefreshSession> => {
-  return prisma.refreshSession.create({ data });
+  return prisma.refreshSession.create({
+    data: {
+      id: data.sessionId,
+      userId: data.userId,
+      refreshToken: data.refreshToken,
+      expiresAt: data.expiresAt,
+    },
+  });
 };
 
 export const findRefreshSessionById = async (
   sessionId: string,
 ): Promise<RefreshSession | null> => {
-  return prisma.refreshSession.findFirst({
-    where: { id: sessionId },
-  });
+  return prisma.refreshSession.findUnique({ where: { id: sessionId } });
 };
 
 export const updateRefreshSessionToken = async (
@@ -48,20 +53,13 @@ export const updateRefreshSessionToken = async (
   });
 };
 
-export const deleteRefreshSessionById = async ( sessionId: string): Promise<void> => {
-  await prisma.refreshSession.deleteMany({
-    where: { id: sessionId },
-  });
+export const deleteRefreshSessionById = async (sessionId: string): Promise<void> => {
+  await prisma.refreshSession.delete({ where: { id: sessionId } });
 };
 
 export const deleteExpiredRefreshSessions = async (): Promise<number> => {
   const result = await prisma.refreshSession.deleteMany({
-    where: {
-      expiresAt: {
-        lte: new Date(),
-      },
-    },
+    where: { expiresAt: { lte: new Date() } },
   });
-
   return result.count;
 };

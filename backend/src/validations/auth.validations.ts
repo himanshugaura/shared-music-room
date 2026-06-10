@@ -25,3 +25,9 @@ export const googleAuthBodySchema = z.object({
 });
 
 export type GoogleAuthBody = z.infer<typeof googleAuthBodySchema>;
+
+export const sendVerificationEmailBodySchema = z.object({
+  email: z.string().email('Please enter a valid email address').trim().toLowerCase(),
+});
+
+export type SendVerificationEmailBody = z.infer<typeof sendVerificationEmailBodySchema>;

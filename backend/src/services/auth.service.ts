@@ -162,12 +162,12 @@ export const refreshTokens = async (
   if (!incomingRefreshToken) {throw new ApiError(401, 'Unauthorized');}
 
   const tokenPayload = verifyRefreshToken(incomingRefreshToken);
-  const session = await findRefreshSessionById(incomingRefreshToken);
+  const session = await findRefreshSessionById(tokenPayload.sessionId);
 
   if (!session) {throw new ApiError(401, 'Unauthorized');}
 
   if (session.expiresAt.getTime() <= Date.now()) {
-    await deleteRefreshSessionById(incomingRefreshToken);
+    await deleteRefreshSessionById(tokenPayload.sessionId);
     throw new ApiError(401, 'Session expired');
   }
 
@@ -195,6 +195,18 @@ export const refreshTokens = async (
 
 export const sendVerificationEmailToUser = async (userId: string): Promise<void> => {
   const user = await findUserById(userId);
+
+  if (!user) {throw new ApiError(404, 'User not found');}
+  if (user.isVerified) {throw new ApiError(400, 'Email is already verified');}
+
+  await verificationEmailSender({
+    to: user.email,
+    url: buildVerificationUrl(user.id),
+  });
+};
+
+export const sendVerificationEmailByEmail = async (email: string): Promise<void> => {
+  const user = await findUserByEmail(email);
 
   if (!user) {throw new ApiError(404, 'User not found');}
   if (user.isVerified) {throw new ApiError(400, 'Email is already verified');}

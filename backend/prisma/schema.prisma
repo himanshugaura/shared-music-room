@@ -38,7 +38,6 @@ model User {
   refreshSessions RefreshSession[]
 
   ownedRooms     Room[]
-  adminRooms     RoomAdmin[]
   memberRooms    RoomMember[]
   addedSongs     QueueSong[]
   votes          SongVote[]
@@ -71,23 +70,11 @@ owner           User        @relation(fields: [ownerId], references: [id])
 createdAt       DateTime    @default(now())
 updatedAt       DateTime    @updatedAt
 
-admins          RoomAdmin[]
 members         RoomMember[]
 queue           MusicQueue?
 
 @@index([ownerId])
 @@index([visibility])
-}
-
-model RoomAdmin {
-roomId          String
-userId          String
-
-room            Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
-user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-@@id([roomId, userId])
-@@index([userId])
 }
 
 model RoomMember {

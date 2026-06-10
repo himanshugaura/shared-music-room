@@ -10,6 +10,8 @@ export const createRoomBodySchema = z.object({
   visibility: z.enum(['public', 'private'], {
     message: 'Visibility must be either "public" or "private"',
   }),
+  shuffleEnabled: z.boolean().optional(),
 });
 
 export type CreateRoomBody = z.infer<typeof createRoomBodySchema>;
+

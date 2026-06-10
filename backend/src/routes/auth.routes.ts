@@ -11,7 +11,12 @@ import {
 } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.js';
-import { googleAuthBodySchema,loginBodySchema, registerBodySchema } from '../validations/auth.validations.js';
+import {
+  googleAuthBodySchema,
+  loginBodySchema,
+  registerBodySchema,
+  sendVerificationEmailBodySchema,
+} from '../validations/auth.validations.js';
 
 const router = Router();
 
@@ -22,6 +27,6 @@ router.post('/refresh', refreshAccessToken);
 router.get('/verify-email', verifyEmail);
 
 router.post('/logout', authMiddleware, logout);
-router.post('/send-verification', sendVerificationEmail);
+router.post('/send-verification', validate(sendVerificationEmailBodySchema), sendVerificationEmail);
 
 export default router;

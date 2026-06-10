@@ -3,12 +3,13 @@ import { Prisma } from "@prisma/client";
 import { customAlphabet } from "nanoid";
 
 import {
-  createMusicQueueRecord,
   createRoomRecord,
   deleteRoomById,
   findPublicRooms,
   findRoomById,
-} from "../repositories/room.repository.js";
+  findRoomOwnerById,
+} from '../repositories/room.repository.js';
+import { createMusicQueueRecord } from "../repositories/musicQueue.repository.js";
 import type { CreateRoomInput, RoomSummary } from "../types/room.types.js";
 import { ApiError } from "../utils/apiError.js";
 
@@ -19,7 +20,7 @@ const MAX_ROOM_CODE_ATTEMPTS = 5;
 const generateRoomCode = customAlphabet(ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH);
 
 export const createRoomService = async (input: CreateRoomInput): Promise<Room> => {
-  const { name, description, visibility, userId } = input;
+  const { name, description, visibility, userId, shuffleEnabled } = input;
 
   let room: Room | undefined;
 
@@ -48,12 +49,17 @@ export const createRoomService = async (input: CreateRoomInput): Promise<Room> =
     throw new ApiError(500, "Failed to generate a unique room code — please try again");
   }
 
-  await createMusicQueueRecord(room.id);
+  await createMusicQueueRecord(room.id , shuffleEnabled ?? false);
 
   return room;
 };
 
-export const deleteRoomService = async (roomId: string): Promise<Room> => {
+export const deleteRoomService = async (roomId: string, requesterId: string): Promise<Room> => {
+  const room = await findRoomOwnerById(roomId);
+
+  if (!room) {throw new ApiError(404, 'Room not found');}
+  if (room.ownerId !== requesterId) {throw new ApiError(403, 'Only the room owner can delete this room');}
+
   return deleteRoomById(roomId);
 };
 

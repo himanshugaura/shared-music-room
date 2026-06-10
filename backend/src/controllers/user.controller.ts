@@ -1,11 +1,12 @@
 import type { Request, Response } from 'express';
 
-import { joinRoomAsMember } from '../repositories/user.repository.js';
 import {
   checkUsernameAvailability,
   getJoinedRooms,
   getOwnedRooms,
   getUserProfile,
+  joinRoom as joinRoomService,
+  joinRoomByCode as joinRoomByCodeService,
   updateUserProfile,
 } from '../services/user.service.js';
 import { ApiResponse } from '../utils/apiResponse.js';
@@ -62,8 +63,16 @@ export const joinRoom = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
   const { roomId } = req.params as { roomId: string };
 
-    joinRoomAsMember(roomId, userId!);
+  await joinRoomService(roomId, userId!);
 
   return new ApiResponse(200, null, 'Joined room successfully').send(res);
 });
 
+export const joinRoomByRoomCode = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { roomCode } = req.params as { roomCode: string };
+
+  await joinRoomByCodeService(roomCode, userId!);
+
+  return new ApiResponse(200, null, 'Joined room successfully').send(res);
+});

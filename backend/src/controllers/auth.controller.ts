@@ -5,6 +5,7 @@ import {
   logoutUser,
   refreshTokens,
   registerUser,
+  sendVerificationEmailByEmail,
   sendVerificationEmailToUser,
   verifyEmailToken,
 } from '../services/auth.service.js';
@@ -101,9 +102,12 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
 });
 
 export const sendVerificationEmail = asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.user?.id;
-
-  await sendVerificationEmailToUser(userId!);
+  if (req.user?.id) {
+    await sendVerificationEmailToUser(req.user.id);
+  } else {
+    const { email } = req.body as { email: string };
+    await sendVerificationEmailByEmail(email);
+  }
 
   return new ApiResponse(200, null, 'Verification email sent').send(res);
 });
