@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Navbar from "@/components/common/Navbar";
-import GrainBackground from "@/components/common/GrainBackground";
 import { Highlighter } from "@/components/ui/highlighter";
 
 function PlayIcon() {
