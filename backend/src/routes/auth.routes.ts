@@ -26,7 +26,7 @@ router.post('/google', validate(googleAuthBodySchema), googleAuth);
 router.post('/refresh', refreshAccessToken);
 router.get('/verify-email', verifyEmail);
 
-router.post('/logout', authMiddleware, logout);
+router.post('/logout', logout);
 router.post('/send-verification', validate(sendVerificationEmailBodySchema), sendVerificationEmail);
 
 export default router;

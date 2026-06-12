@@ -3,6 +3,7 @@ import type {
   Request,
   Response,
 } from "express";
+import jwt from 'jsonwebtoken';
 
 import { ApiError } from "../utils/apiError.js";
 
@@ -20,8 +21,17 @@ export const errorHandler = (
     });
   }
 
+  if (err instanceof jwt.TokenExpiredError || err instanceof jwt.JsonWebTokenError) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+    });
+  }
+
+  console.error("Unexpected error:", err.message);
+
   return res.status(500).json({
     success: false,
-    message: "Internal Server Error",
+    message: err.message || "Internal Server Error",
   });
 };

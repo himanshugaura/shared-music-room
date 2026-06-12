@@ -28,7 +28,10 @@ import {
 import { verificationEmailSender } from '../utils/sendMail.js';
 import { nanoid } from 'nanoid';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+});
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -112,18 +115,30 @@ export const loginUser = async (email: string, password: string): Promise<AuthTo
   };
 };
 
-export const googleAuthUser = async (credential: string): Promise<AuthTokenResponse> => {
-  if (!credential) {throw new ApiError(400, 'Google credential is required');}
+export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> => {
+  if (!code) {
+    throw new ApiError(400, "Authorization code is required");
+  }
+
+  const { tokens } = await googleClient.getToken({
+  code,
+  redirect_uri: "postmessage",
+});
+
+
+  if (!tokens.id_token) {
+    throw new ApiError(401, "Google did not return an ID token");
+  }
 
   const ticket = await googleClient.verifyIdToken({
-    idToken: credential,
+    idToken: tokens.id_token,
     audience: process.env.GOOGLE_CLIENT_ID!,
   });
 
   const payload = ticket.getPayload();
 
   if (!payload?.email || !payload.sub) {
-    throw new ApiError(401, 'Invalid Google token');
+    throw new ApiError(401, "Invalid Google token");
   }
 
   let user = await findUserByEmail(payload.email);

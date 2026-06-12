@@ -36,7 +36,7 @@ export interface LoginBody {
 }
 
 export interface GoogleAuthBody {
-  credential: string;
+  code: string;
 }
 
 export interface AuthPayload {

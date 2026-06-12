@@ -64,9 +64,9 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
-  const { credential } = req.body as GoogleAuthBody;
+  const { code } = req.body as GoogleAuthBody;
 
-  const { accessToken, refreshToken, user } = await googleAuthUser(credential);
+  const { accessToken, refreshToken, user } = await googleAuthUser(code);
 
   setAuthCookies(res, accessToken, refreshToken);
 
@@ -74,15 +74,16 @@ export const googleAuth = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const refreshToken = req.cookies?.refreshToken;
+  const refreshToken = req.cookies?.refreshToken as string | undefined;
 
-  if (!refreshToken) {
-    throw new ApiError(401, 'Refresh token is required');
+  if (refreshToken) {
+    try {
+      const { sessionId } = verifyRefreshToken(refreshToken);
+      await logoutUser(sessionId);
+    } catch {
+    
+    }
   }
-
-  const { sessionId } = verifyRefreshToken(refreshToken);
-
-  await logoutUser(sessionId);
 
   res
     .clearCookie('accessToken', CLEAR_COOKIE_OPTIONS)
@@ -94,11 +95,19 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
 export const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken = req.cookies?.refreshToken as string | undefined;
 
-  const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken!);
+  try {
+    const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken!);
 
-  setAuthCookies(res, newAccessToken, newRefreshToken);
+    setAuthCookies(res, newAccessToken, newRefreshToken);
 
-  return new ApiResponse(200, null, 'Tokens refreshed successfully').send(res);
+    return new ApiResponse(200, null, 'Tokens refreshed successfully').send(res);
+  } catch (error) {
+    res
+      .clearCookie('accessToken', CLEAR_COOKIE_OPTIONS)
+      .clearCookie('refreshToken', CLEAR_COOKIE_OPTIONS);
+
+    throw error; 
+  }
 });
 
 export const sendVerificationEmail = asyncHandler(async (req: Request, res: Response) => {

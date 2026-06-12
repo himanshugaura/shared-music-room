@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express';
+import jwt from 'jsonwebtoken';
 
 import { findUserProfileById } from '../repositories/user.repository.js';
 import { ApiError } from '../utils/apiError.js';
@@ -16,7 +17,15 @@ export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, nex
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const { userId } = verifyAccessToken(token);
+  let userId: string;
+  try {
+    ({ userId } = verifyAccessToken(token));
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      throw new ApiError(401, 'Access token expired');
+    }
+    throw new ApiError(401, 'Invalid access token');
+  }
 
   const user = await findUserProfileById(userId);
 
