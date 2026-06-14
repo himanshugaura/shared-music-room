@@ -69,22 +69,38 @@ export const advanceToNextSong = async (
   queueId: string,
   currentPosition: number,
 ): Promise<MusicQueue | null> => {
-  const nextSong = await prisma.queueSong.findFirst({
-    where: { queueId, position: { gt: currentPosition } },
-    orderBy: { position: 'asc' },
-    select: { id: true },
-  });
+  return prisma.$transaction(async (tx) => {
+    const nextSong = await tx.queueSong.findFirst({
+      where: { queueId, position: { gt: currentPosition } },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    });
 
-  if (!nextSong) return null;
+    await tx.queueSong.deleteMany({
+      where: { queueId, position: { lte: currentPosition } },
+    });
 
-  return prisma.musicQueue.update({
-    where: { id: queueId },
-    data: {
-      currentQueueSongId: nextSong.id,
-      currentPositionMs: 0,
-      playbackStartedAt: new Date(),
-      isPlaying: true,
-    },
+    if (!nextSong) {
+      return tx.musicQueue.update({
+        where: { id: queueId },
+        data: {
+          currentQueueSongId: null,
+          isPlaying: false,
+          currentPositionMs: 0,
+          playbackStartedAt: null,
+        },
+      });
+    }
+
+    return tx.musicQueue.update({
+      where: { id: queueId },
+      data: {
+        currentQueueSongId: nextSong.id,
+        currentPositionMs: 0,
+        playbackStartedAt: new Date(),
+        isPlaying: true,
+      },
+    });
   });
 };
 
