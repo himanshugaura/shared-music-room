@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthGate } from "@/components/auth/AuthGate";
+import { Toaster } from "sonner";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -34,14 +35,29 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("h-full", inter.variable, "font-sans", geist.variable)}
+      className={cn(inter.variable, "font-sans", geist.variable)}
     >
-      <body className="h-full overflow-hidden antialiased">
+      <body className="antialiased min-h-screen">
         <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
           <QueryProvider>
             <AuthGate>{children}</AuthGate>
           </QueryProvider>
         </GoogleOAuthProvider>
+        <Toaster
+          position="top-right"
+          richColors
+          theme="dark"
+          toastOptions={{
+            style: {
+              background: "rgba(22,27,34,0.98)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "#eceff4",
+              backdropFilter: "blur(16px)",
+              fontFamily: "var(--font-inter), system-ui, sans-serif",
+              fontSize: "13px",
+            },
+          }}
+        />
       </body>
     </html>
   );

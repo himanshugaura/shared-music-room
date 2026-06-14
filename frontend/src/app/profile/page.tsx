@@ -1,23 +1,72 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
-import { Rubik_Glitch } from "next/font/google";
-import { useMe, useUpdateProfile, useLogout } from "@/hooks/useAuth";
+import { useState, useRef, useEffect, useCallback } from "react";
+import Navbar from "@/components/common/Navbar";
+import { useMe, useUpdateProfile, useLogout, checkUsernameAvailable } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store";
 
-const glitchFont = Rubik_Glitch({
-  subsets: ["latin"],
-  variable: "--font-glitch",
-  weight: "400",
-});
+/* ─── Constants ─────────────────────────────────────────────────────── */
 
-function AvatarUpload({
-  avatarUrl,
-  name,
-  email,
-  preview,
-  onClick,
+const USERNAME_DEBOUNCE_MS = 500;
+const USERNAME_MIN = 3;
+const USERNAME_MAX = 30;
+const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
+
+/* ─── Helpers ───────────────────────────────────────────────────────── */
+
+function Spinner({ color = "#0f1117", size = 16 }: { color?: string; size?: number }) {
+  return (
+    <svg className="animate-spin" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="rgba(0,0,0,0.15)" strokeWidth="3" />
+      <path d="M12 2 A10 10 0 0 1 22 12" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Validate username client-side, returns error string or "" */
+function validateUsernameLocally(value: string): string {
+  if (!value) return "";
+  if (value.length < USERNAME_MIN) return `At least ${USERNAME_MIN} characters`;
+  if (value.length > USERNAME_MAX) return `Max ${USERNAME_MAX} characters`;
+  if (!USERNAME_REGEX.test(value)) return "Only letters, numbers and underscores";
+  return "";
+}
+
+/* ─── Small UI pieces ───────────────────────────────────────────────── */
+
+function SectionCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div
+      style={{
+        background: "rgba(22,27,34,0.6)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.07)",
+        borderRadius: "16px",
+        overflow: "hidden",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function SectionHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "#eceff4", letterSpacing: "-0.01em" }}>
+        {title}
+      </h2>
+      {description && (
+        <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#6b7a8d" }}>{description}</p>
+      )}
+    </div>
+  );
+}
+
+function AvatarEditor({
+  avatarUrl, name, email, preview, onClick,
 }: {
   avatarUrl: string | null;
   name: string | null;
@@ -26,14 +75,9 @@ function AvatarUpload({
   onClick: () => void;
 }) {
   const initials = (name || email || "?")
-    .trim()
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
+    .trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const src = preview || avatarUrl;
+  const [hovered, setHovered] = useState(false);
 
   return (
     <button
@@ -41,102 +85,293 @@ function AvatarUpload({
       id="avatar-upload-btn"
       onClick={onClick}
       aria-label="Change profile photo"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         position: "relative",
-        width: "96px",
-        height: "96px",
+        width: "88px",
+        height: "88px",
         borderRadius: "50%",
-        border: "2px solid rgba(163,190,140,0.35)",
-        background: src ? "transparent" : "rgba(163,190,140,0.12)",
+        border: hovered ? "2px solid rgba(163,190,140,0.6)" : "2px solid rgba(163,190,140,0.25)",
+        background: src
+          ? "transparent"
+          : "linear-gradient(135deg, rgba(163,190,140,0.2) 0%, rgba(143,188,187,0.15) 100%)",
         overflow: "hidden",
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        transition: "border-color 0.2s",
+        transition: "all 0.2s ease",
         outline: "none",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.7)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.35)";
+        boxShadow: hovered
+          ? "0 0 0 4px rgba(163,190,140,0.1), 0 8px 24px rgba(0,0,0,0.4)"
+          : "0 4px 16px rgba(0,0,0,0.3)",
       }}
     >
       {src ? (
-        <img
-          src={src}
-          alt="Profile avatar"
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
+        <img src={src} alt="Profile avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       ) : (
-        <span
-          style={{
-            fontSize: "28px",
-            fontWeight: 700,
-            color: "#a3be8c",
-            letterSpacing: "0.02em",
-            userSelect: "none",
-          }}
-        >
+        <span style={{ fontSize: "26px", fontWeight: 700, color: "#a3be8c", userSelect: "none" }}>
           {initials}
         </span>
       )}
-
-      {/* Hover overlay */}
       <span
         aria-hidden="true"
         style={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(0,0,0,0.45)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: 0,
-          transition: "opacity 0.2s",
-          borderRadius: "50%",
-          color: "#eceff4",
-          fontSize: "11px",
-          fontWeight: 600,
-          letterSpacing: "0.04em",
-          flexDirection: "column",
-          gap: "4px",
+          position: "absolute", inset: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          opacity: hovered ? 1 : 0, transition: "opacity 0.2s",
+          flexDirection: "column", gap: "4px",
+          color: "#eceff4", fontSize: "10px", fontWeight: 600, letterSpacing: "0.04em",
         }}
-        className="avatar-overlay"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
           <circle cx="12" cy="13" r="4" />
         </svg>
         <span>Change</span>
       </span>
-      <style>{`
-        #avatar-upload-btn:hover .avatar-overlay { opacity: 1 !important; }
-      `}</style>
     </button>
   );
 }
 
-function Spinner() {
+/* ─── Username field with debounce check ────────────────────────────── */
+
+type UsernameStatus =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "available" }
+  | { state: "taken"; message: string }
+  | { state: "invalid"; message: string };
+
+function UsernameField({
+  value,
+  onChange,
+  currentUsername,
+}: {
+  value: string;
+  onChange: (v: string, status: UsernameStatus) => void;
+  currentUsername: string | null | undefined;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [status, setStatus] = useState<UsernameStatus>({ state: "idle" });
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestValue = useRef(value);
+
+  // Check availability with debounce
+  const scheduleCheck = useCallback(
+    (val: string) => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+      // Already same as current saved username — skip check
+      if (val === currentUsername) {
+        const next: UsernameStatus = { state: "idle" };
+        setStatus(next);
+        onChange(val, next);
+        return;
+      }
+
+      const localErr = validateUsernameLocally(val);
+      if (localErr) {
+        const next: UsernameStatus = { state: "invalid", message: localErr };
+        setStatus(next);
+        onChange(val, next);
+        return;
+      }
+
+      // Show checking state immediately
+      const checking: UsernameStatus = { state: "checking" };
+      setStatus(checking);
+      onChange(val, checking);
+
+      debounceTimer.current = setTimeout(async () => {
+        if (latestValue.current !== val) return; // stale, skip
+        const result = await checkUsernameAvailable(val);
+        if (latestValue.current !== val) return; // stale after await
+        const next: UsernameStatus = result.available
+          ? { state: "available" }
+          : { state: "taken", message: result.message };
+        setStatus(next);
+        onChange(val, next);
+      }, USERNAME_DEBOUNCE_MS);
+    },
+    [currentUsername, onChange]
+  );
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/\s/g, "");
+    latestValue.current = raw;
+    scheduleCheck(raw);
+  }
+
+  // Border color based on status
+  const borderColor = (() => {
+    if (!value) return focused ? "rgba(163,190,140,0.45)" : "rgba(255,255,255,0.08)";
+    if (status.state === "invalid" || status.state === "taken")
+      return focused ? "rgba(191,97,106,0.6)" : "rgba(191,97,106,0.4)";
+    if (status.state === "available")
+      return focused ? "rgba(163,190,140,0.6)" : "rgba(163,190,140,0.4)";
+    return focused ? "rgba(163,190,140,0.45)" : "rgba(255,255,255,0.08)";
+  })();
+
+  const boxShadow = (() => {
+    if (!focused) return "none";
+    if (status.state === "invalid" || status.state === "taken")
+      return "0 0 0 3px rgba(191,97,106,0.1)";
+    return "0 0 0 3px rgba(163,190,140,0.07)";
+  })();
+
+  // Trailing status icon/text
+  const trailingEl = (() => {
+    if (!value) return null;
+    if (status.state === "checking")
+      return (
+        <span style={{ paddingRight: "12px", display: "flex", alignItems: "center" }}>
+          <Spinner color="#6b7a8d" size={13} />
+        </span>
+      );
+    if (status.state === "available")
+      return (
+        <span style={{ paddingRight: "12px", display: "flex", alignItems: "center" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a3be8c" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </span>
+      );
+    if (status.state === "taken" || status.state === "invalid")
+      return (
+        <span style={{ paddingRight: "12px", display: "flex", alignItems: "center" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#bf616a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </span>
+      );
+    return null;
+  })();
+
+  const errorMessage = (status.state === "taken" || status.state === "invalid") ? status.message : null;
+
   return (
-    <svg
-      className="animate-spin"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" stroke="rgba(0,0,0,0.2)" strokeWidth="3" />
-      <path d="M12 2 A10 10 0 0 1 22 12" stroke="#0f1117" strokeWidth="3" strokeLinecap="round" />
-    </svg>
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <label htmlFor="profile-username" style={{ fontSize: "12px", fontWeight: 500, color: "#d8dee9", letterSpacing: "0.02em" }}>
+        Username
+      </label>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          background: "rgba(255,255,255,0.04)",
+          border: `1px solid ${borderColor}`,
+          borderRadius: "10px",
+          transition: "border-color 0.2s, box-shadow 0.2s",
+          boxShadow,
+        }}
+      >
+        <span style={{ paddingLeft: "14px", paddingRight: "3px", fontSize: "13px", color: "#6b7a8d", userSelect: "none" }} aria-hidden="true">
+          @
+        </span>
+        <input
+          id="profile-username"
+          type="text"
+          autoComplete="username"
+          placeholder="yourhandle"
+          value={value}
+          onChange={handleChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          maxLength={USERNAME_MAX}
+          style={{
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            padding: "11px 6px 11px 0",
+            fontSize: "13px",
+            color: "#eceff4",
+            width: "100%",
+          }}
+        />
+        {trailingEl}
+      </div>
+      {errorMessage && (
+        <p style={{ margin: 0, fontSize: "11.5px", color: "#bf616a", display: "flex", alignItems: "center", gap: "4px" }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {errorMessage}
+        </p>
+      )}
+      {status.state === "available" && (
+        <p style={{ margin: 0, fontSize: "11.5px", color: "#a3be8c", display: "flex", alignItems: "center", gap: "4px" }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Username is available
+        </p>
+      )}
+    </div>
   );
 }
 
+/* ─── Simple text input ─────────────────────────────────────────────── */
+
+function InputField({
+  id, label, value, onChange, placeholder, disabled = false, prefix,
+}: {
+  id: string; label: string; value: string;
+  onChange?: (v: string) => void;
+  placeholder?: string; disabled?: boolean; prefix?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <label htmlFor={id} style={{ fontSize: "12px", fontWeight: 500, color: "#d8dee9", letterSpacing: "0.02em" }}>
+        {label}
+      </label>
+      <div
+        style={{
+          display: "flex", alignItems: "center",
+          background: disabled ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+          border: disabled ? "1px solid rgba(255,255,255,0.05)"
+            : focused ? "1px solid rgba(163,190,140,0.45)"
+            : "1px solid rgba(255,255,255,0.08)",
+          borderRadius: "10px",
+          transition: "border-color 0.2s, box-shadow 0.2s",
+          boxShadow: !disabled && focused ? "0 0 0 3px rgba(163,190,140,0.07)" : "none",
+        }}
+      >
+        {prefix && (
+          <span style={{ paddingLeft: "14px", paddingRight: "3px", fontSize: "13px", color: "#6b7a8d", userSelect: "none" }} aria-hidden="true">
+            {prefix}
+          </span>
+        )}
+        <input
+          id={id} type="text" value={value} disabled={disabled} placeholder={placeholder}
+          onChange={(e) => onChange?.(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            padding: prefix ? "11px 14px 11px 0" : "11px 14px",
+            fontSize: "13px",
+            color: disabled ? "#4a5568" : "#eceff4",
+            cursor: disabled ? "default" : "text", width: "100%",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main page ─────────────────────────────────────────────────────── */
+
 export default function ProfilePage() {
-  useMe(); // Ensure user is loaded
+  useMe();
 
   const user = useAuthStore((s) => s.user);
   const { mutate: updateProfile, isPending } = useUpdateProfile();
@@ -144,23 +379,18 @@ export default function ProfilePage() {
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>({ state: "idle" });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [focused, setFocused] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fill inputs from current user data
   useEffect(() => {
     if (user) {
       setName(user.name ?? "");
       setUsername(user.username ?? "");
     }
   }, [user]);
-
-  const profileComplete = !!(user?.name || user?.username);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -173,8 +403,8 @@ export default function ProfilePage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSuccessMsg(null);
-    setErrorMsg(null);
+    // Block submit if username is being checked or is invalid/taken
+    if (usernameStatus.state === "checking" || usernameStatus.state === "taken" || usernameStatus.state === "invalid") return;
 
     const formData = new FormData();
     if (name.trim()) formData.append("name", name.trim());
@@ -183,342 +413,274 @@ export default function ProfilePage() {
 
     updateProfile(formData, {
       onSuccess: () => {
-        setSuccessMsg("Profile saved successfully!");
         setAvatarFile(null);
-      },
-      onError: (err: unknown) => {
-        const msg =
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          "Failed to save profile. Please try again.";
-        setErrorMsg(msg);
+        setUsernameStatus({ state: "idle" });
       },
     });
   }
 
-  function getInputBorderStyle(field: string) {
-    const isFocused = focused === field;
-    return {
-      border: isFocused ? "1px solid rgba(163,190,140,0.5)" : "1px solid rgba(255,255,255,0.08)",
-      boxShadow: isFocused ? "0 0 0 3px rgba(163,190,140,0.08)" : "none",
-    };
-  }
+  const handleUsernameChange = useCallback((val: string, status: UsernameStatus) => {
+    setUsername(val);
+    setUsernameStatus(status);
+  }, []);
+
+  const isSaveDisabled =
+    isPending ||
+    usernameStatus.state === "checking" ||
+    usernameStatus.state === "taken" ||
+    usernameStatus.state === "invalid";
+
+  const profileComplete = !!(user?.name || user?.username);
 
   return (
-    <main
-      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden"
-      style={{ background: "#0d1117" }}
-    >
-      {/* Ambient glow blobs */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          style={{
-            position: "absolute",
-            top: "10%",
-            left: "15%",
-            width: "480px",
-            height: "480px",
-            background: "radial-gradient(ellipse at center, rgba(163,190,140,0.09) 0%, transparent 70%)",
-            filter: "blur(40px)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "5%",
-            right: "10%",
-            width: "380px",
-            height: "380px",
-            background: "radial-gradient(ellipse at center, rgba(143,188,187,0.07) 0%, transparent 70%)",
-            filter: "blur(50px)",
-          }}
-        />
-        {/* Subtle grid */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
+    <div className="min-h-screen w-full" style={{ background: "#0b0f16", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* Ambient glows */}
+      <div aria-hidden="true" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "-10%", right: "-5%", width: "600px", height: "600px", background: "radial-gradient(ellipse at center, rgba(163,190,140,0.06) 0%, transparent 65%)", filter: "blur(60px)" }} />
+        <div style={{ position: "absolute", bottom: "5%", left: "-8%", width: "500px", height: "500px", background: "radial-gradient(ellipse at center, rgba(143,188,187,0.05) 0%, transparent 65%)", filter: "blur(60px)" }} />
       </div>
 
-      {/* Back link — shown only if profile is complete */}
-      {profileComplete && (
-        <Link
-          href="/dashboard"
-          id="back-to-dashboard"
-          className="absolute top-6 left-6 z-20 flex items-center gap-2 text-sm transition-colors duration-150 focus-visible:outline-none"
-          style={{ color: "#6b7a8d" }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "#d8dee9")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "#6b7a8d")}
-          aria-label="Back to dashboard"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-          Dashboard
-        </Link>
-      )}
+      <Navbar />
 
-      {/* Card */}
-      <div
-        className="relative z-10 w-full max-w-md mx-4"
+      <main
+        className="profile-main-layout"
         style={{
-          background: "rgba(22,27,34,0.75)",
-          backdropFilter: "blur(24px) saturate(1.5)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.5)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "24px",
-          padding: "40px 36px 36px",
-          boxShadow:
-            "0 0 0 1px rgba(163,190,140,0.04), 0 32px 64px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
+          position: "relative", zIndex: 1,
+          maxWidth: "900px", margin: "0 auto",
+          padding: "110px 24px 80px",
+          display: "grid",
+          gridTemplateColumns: "200px 1fr",
+          gap: "28px",
+          alignItems: "start",
         }}
       >
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-1 mb-6">
-          <Link href="/" className="focus-visible:outline-none" tabIndex={-1} aria-hidden="true">
-            <span className={`${glitchFont.className} text-3xl text-[#eceff4] tracking-wide`}>
-              Echo
-            </span>
-          </Link>
-        </div>
-
-        <h1 className="text-[#eceff4] text-2xl font-bold text-center mb-1 tracking-tight">
-          Set up your profile
-        </h1>
-        <p className="text-[#6b7a8d] text-sm text-center mb-6">
-          {profileComplete ? "Edit your profile information" : "Complete your profile to get started"}
-        </p>
-
-        {/* Incomplete profile notice */}
-        {!profileComplete && (
+        {/* ── Sidebar ── */}
+        <aside>
           <div
-            role="status"
-            className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm mb-5"
             style={{
-              background: "rgba(163,190,140,0.08)",
-              border: "1px solid rgba(163,190,140,0.2)",
-              color: "#a3be8c",
+              background: "rgba(22,27,34,0.6)",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: "14px",
+              padding: "20px",
+              display: "flex", flexDirection: "column", alignItems: "center",
+              gap: "10px", textAlign: "center",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>Complete your profile to get started</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
-          {/* Avatar */}
-          <div className="flex flex-col items-center gap-3">
-            <AvatarUpload
-              avatarUrl={user?.avatarUrl ?? null}
-              name={user?.name ?? null}
-              email={user?.email ?? ""}
-              preview={avatarPreview}
-              onClick={() => fileInputRef.current?.click()}
-            />
-            <p className="text-xs" style={{ color: "#6b7a8d" }}>
-              Click to upload a photo
-            </p>
-            <input
-              ref={fileInputRef}
-              id="avatar-file-input"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-              aria-label="Upload profile photo"
-            />
-          </div>
-
-          {/* Email (read-only) */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="profile-email" className="text-xs font-medium tracking-wide" style={{ color: "#d8dee9" }}>
-              Email
-            </label>
+            {/* Mini avatar */}
             <div
-              className="rounded-xl px-4 py-3 text-sm"
               style={{
-                background: "rgba(255,255,255,0.02)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                color: "#6b7a8d",
-                userSelect: "all",
+                width: "56px", height: "56px", borderRadius: "50%",
+                border: "2px solid rgba(163,190,140,0.25)",
+                background: "linear-gradient(135deg, rgba(163,190,140,0.15) 0%, rgba(143,188,187,0.1) 100%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden", flexShrink: 0,
               }}
-              id="profile-email"
-              aria-label="Email address (read-only)"
             >
-              {user?.email ?? "—"}
+              {avatarPreview || user?.avatarUrl ? (
+                <img src={avatarPreview || user?.avatarUrl || ""} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <span style={{ fontSize: "18px", fontWeight: 700, color: "#a3be8c", userSelect: "none" }}>
+                  {(user?.name || user?.email || "?").trim().split(/\s+/).map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                </span>
+              )}
             </div>
-          </div>
 
-          {/* Name */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="profile-name" className="text-xs font-medium tracking-wide" style={{ color: "#d8dee9" }}>
-              Name
-            </label>
-            <div
-              className="relative rounded-xl transition-all duration-200"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                ...getInputBorderStyle("name"),
-              }}
-            >
-              <input
-                id="profile-name"
-                type="text"
-                autoComplete="name"
-                placeholder="Your display name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onFocus={() => setFocused("name")}
-                onBlur={() => setFocused(null)}
-                className="w-full bg-transparent px-4 py-3 text-sm focus:outline-none rounded-xl"
-                style={{ color: "#eceff4" }}
-              />
+            <div>
+              <p style={{ margin: "0 0 2px", fontSize: "13px", fontWeight: 600, color: "#eceff4" }}>
+                {user?.name || user?.username || "New user"}
+              </p>
+              <p style={{ margin: 0, fontSize: "11px", color: "#6b7a8d" }}>{user?.email}</p>
             </div>
-          </div>
 
-          {/* Username */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="profile-username" className="text-xs font-medium tracking-wide" style={{ color: "#d8dee9" }}>
-              Username
-            </label>
-            <div
-              className="relative flex items-center rounded-xl transition-all duration-200"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                ...getInputBorderStyle("username"),
-              }}
-            >
-              <span
-                className="pl-4 pr-1 text-sm select-none"
-                style={{ color: "#6b7a8d" }}
-                aria-hidden="true"
-              >
-                @
+            {!profileComplete && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: "4px",
+                padding: "3px 10px", borderRadius: "20px",
+                background: "rgba(163,190,140,0.1)", border: "1px solid rgba(163,190,140,0.2)",
+                color: "#a3be8c", fontSize: "10px", fontWeight: 600,
+                letterSpacing: "0.04em", textTransform: "uppercase",
+              }}>
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                Incomplete
               </span>
-              <input
-                id="profile-username"
-                type="text"
-                autoComplete="username"
-                placeholder="yourhandle"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/\s/g, ""))}
-                onFocus={() => setFocused("username")}
-                onBlur={() => setFocused(null)}
-                className="flex-1 bg-transparent pr-4 py-3 text-sm focus:outline-none rounded-r-xl"
-                style={{ color: "#eceff4" }}
-              />
-            </div>
-          </div>
-
-          {/* Success banner */}
-          {successMsg && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm"
-              style={{
-                background: "rgba(163,190,140,0.1)",
-                border: "1px solid rgba(163,190,140,0.25)",
-                color: "#a3be8c",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              {successMsg}
-            </div>
-          )}
-
-          {/* Error banner */}
-          {errorMsg && (
-            <div
-              role="alert"
-              aria-live="assertive"
-              className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm"
-              style={{
-                background: "rgba(191,97,106,0.1)",
-                border: "1px solid rgba(191,97,106,0.25)",
-                color: "#bf616a",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Save button */}
-          <button
-            id="profile-save-btn"
-            type="submit"
-            disabled={isPending}
-            className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a3be8c]/60 mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{
-              background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
-              color: "#0f1117",
-            }}
-            onMouseEnter={(e) => {
-              if (isPending) return;
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(163,190,140,0.25)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-            }}
-            onMouseDown={(e) => {
-              if (isPending) return;
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.975)";
-            }}
-            onMouseUp={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)";
-            }}
-          >
-            {isPending ? (
-              <span className="flex items-center justify-center gap-2">
-                <Spinner />
-                Saving…
-              </span>
-            ) : (
-              "Save profile"
             )}
-          </button>
+          </div>
 
-          {/* Divider */}
-          <div style={{ height: "1px", background: "rgba(255,255,255,0.06)", margin: "4px 0" }} />
+          {/* Nav */}
+          <div style={{ marginTop: "12px", background: "rgba(22,27,34,0.6)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "8px" }}>
+            <p style={{ margin: "0 0 4px", padding: "4px 8px", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", color: "rgba(107,122,141,0.7)", textTransform: "uppercase" }}>
+              Settings
+            </p>
+            {/* Account — active */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", borderRadius: "10px", background: "rgba(163,190,140,0.12)", color: "#a3be8c", fontWeight: 600, fontSize: "14px" }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              Account
+              <span style={{ marginLeft: "auto", width: "4px", height: "4px", borderRadius: "50%", background: "#a3be8c" }} />
+            </div>
+          </div>
+        </aside>
 
-          {/* Logout */}
-          <button
-            id="profile-logout-btn"
-            type="button"
-            onClick={() => logout()}
-            disabled={isLoggingOut || isPending}
-            className="w-full py-2.5 rounded-xl text-sm font-medium transition-colors duration-150 cursor-pointer focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ color: "#6b7a8d", background: "transparent" }}
-            onMouseEnter={(e) => {
-              if (isLoggingOut || isPending) return;
-              (e.currentTarget as HTMLButtonElement).style.color = "#bf616a";
-              (e.currentTarget as HTMLButtonElement).style.background = "rgba(191,97,106,0.06)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "#6b7a8d";
-              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            }}
-          >
-            {isLoggingOut ? "Signing out…" : "Log out"}
-          </button>
-        </form>
-      </div>
-    </main>
+        {/* ── Content ── */}
+        <div>
+          <div style={{ marginBottom: "24px" }}>
+            <h1 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 700, color: "#eceff4", letterSpacing: "-0.02em" }}>
+              Account settings
+            </h1>
+            <p style={{ margin: 0, fontSize: "13px", color: "#6b7a8d" }}>
+              Manage your profile, photo, and personal details.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+            {/* Avatar card */}
+            <SectionCard>
+              <SectionHeader title="Profile photo" description="Shown on your public profile and in rooms." />
+              <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "20px" }}>
+                <AvatarEditor
+                  avatarUrl={user?.avatarUrl ?? null}
+                  name={user?.name ?? null}
+                  email={user?.email ?? ""}
+                  preview={avatarPreview}
+                  onClick={() => fileInputRef.current?.click()}
+                />
+                <div>
+                  <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#d8dee9", fontWeight: 500 }}>
+                    {user?.name || user?.username || "Your name"}
+                  </p>
+                  <p style={{ margin: "0 0 12px", fontSize: "12px", color: "#6b7a8d" }}>{user?.email}</p>
+                  <button
+                    type="button"
+                    id="upload-photo-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: "6px",
+                      padding: "6px 14px", borderRadius: "8px",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "#d8dee9", fontSize: "12px", fontWeight: 500,
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.09)";
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)";
+                      (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.12)";
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    Upload photo
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Personal info card */}
+            <SectionCard>
+              <SectionHeader title="Personal information" />
+              <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div className="profile-fields-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <InputField
+                    id="profile-name"
+                    label="Display name"
+                    value={name}
+                    onChange={setName}
+                    placeholder="Your display name"
+                  />
+                  <UsernameField
+                    value={username}
+                    onChange={handleUsernameChange}
+                    currentUsername={user?.username}
+                  />
+                </div>
+                <InputField
+                  id="profile-email"
+                  label="Email address"
+                  value={user?.email ?? ""}
+                  disabled
+                />
+              </div>
+
+
+
+              {/* Card footer */}
+              <div style={{ padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  id="profile-save-btn"
+                  type="submit"
+                  disabled={isSaveDisabled}
+                  title={
+                    usernameStatus.state === "checking" ? "Checking username…"
+                    : usernameStatus.state === "taken" ? "Username is taken"
+                    : usernameStatus.state === "invalid" ? "Fix username errors first"
+                    : undefined
+                  }
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: "8px",
+                    padding: "9px 22px", borderRadius: "10px", border: "none",
+                    background: isSaveDisabled
+                      ? "rgba(163,190,140,0.4)"
+                      : "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
+                    color: "#0f1117",
+                    fontSize: "13px", fontWeight: 600,
+                    cursor: isSaveDisabled ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: isSaveDisabled ? "none" : "0 4px 14px rgba(163,190,140,0.2)",
+                    opacity: isSaveDisabled && !isPending ? 0.65 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isSaveDisabled) return;
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 6px 20px rgba(163,190,140,0.3)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = isSaveDisabled ? "none" : "0 4px 14px rgba(163,190,140,0.2)";
+                  }}
+                >
+                  {isPending ? (
+                    <><Spinner />Saving…</>
+                  ) : usernameStatus.state === "checking" ? (
+                    <><Spinner color="#0f1117" />Checking…</>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                        <polyline points="17 21 17 13 7 13 7 21" />
+                        <polyline points="7 3 7 8 15 8" />
+                      </svg>
+                      Save changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </SectionCard>
+          </form>
+        </div>
+      </main>
+
+      <input
+        ref={fileInputRef}
+        id="avatar-file-input"
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+        aria-label="Upload profile photo"
+      />
+    </div>
   );
 }

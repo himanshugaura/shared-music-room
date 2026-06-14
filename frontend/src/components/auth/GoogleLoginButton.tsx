@@ -14,7 +14,7 @@ export default function GoogleOAuthButton() {
     },
 
     onError: () => {
-      console.error("Google login failed");
+      // Handled by useGoogleAuth onError (toast)
     },
   });
 

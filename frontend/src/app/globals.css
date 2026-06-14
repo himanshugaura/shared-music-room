@@ -206,3 +206,30 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Responsive: Profile page ─────────────────────────────────────── */
+
+/* Sidebar + content side-by-side by default, stacks on ≤ 640px */
+@media (max-width: 640px) {
+  .profile-main-layout {
+    grid-template-columns: 1fr !important;
+    padding-top: 90px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    gap: 16px !important;
+  }
+
+  /* Name / Username fields stack vertically */
+  .profile-fields-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Responsive: auth card padding ────────────────────────────────── */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 28px 20px 24px !important;
+    border-radius: 18px !important;
+    margin: 0 12px !important;
+  }
+}

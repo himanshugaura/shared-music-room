@@ -56,8 +56,6 @@ export default function VerifyMailPage() {
   const { mutate: resend, isPending } = useResendVerification();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
 
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
@@ -68,19 +66,8 @@ export default function VerifyMailPage() {
 
   function handleResend() {
     if (cooldown > 0 || isPending) return;
-    setSuccessMsg(null);
-    setErrorMsg(null);
     resend(undefined, {
-      onSuccess: () => {
-        setSuccessMsg("Email sent! Check your inbox.");
-        setCooldown(60);
-      },
-      onError: (err: unknown) => {
-        const msg =
-          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-          "Failed to send verification email. Please try again.";
-        setErrorMsg(msg);
-      },
+      onSuccess: () => setCooldown(60),
     });
   }
 
@@ -129,7 +116,7 @@ export default function VerifyMailPage() {
 
       {/* Card */}
       <div
-        className="relative z-10 w-full max-w-md mx-4"
+        className="auth-card relative z-10 w-full max-w-md mx-4"
         style={{
           background: "rgba(22,27,34,0.75)",
           backdropFilter: "blur(24px) saturate(1.5)",
@@ -185,65 +172,7 @@ export default function VerifyMailPage() {
           We sent a verification link to your inbox. Click the link in the email to activate your account.
         </p>
 
-        {/* Success message */}
-        {successMsg && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm mb-4"
-            style={{
-              background: "rgba(163,190,140,0.1)",
-              border: "1px solid rgba(163,190,140,0.25)",
-              color: "#a3be8c",
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            {successMsg}
-          </div>
-        )}
 
-        {/* Error message */}
-        {errorMsg && (
-          <div
-            role="alert"
-            aria-live="assertive"
-            className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm mb-4"
-            style={{
-              background: "rgba(191,97,106,0.1)",
-              border: "1px solid rgba(191,97,106,0.25)",
-              color: "#bf616a",
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            {errorMsg}
-          </div>
-        )}
 
         {/* Resend button */}
         <button

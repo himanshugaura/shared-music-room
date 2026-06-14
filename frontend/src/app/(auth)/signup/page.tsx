@@ -115,8 +115,7 @@ export default function SignupPage() {
   const [confirm, setConfirm] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
   const [touched, setTouched] = useState<TouchedMap>({});
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const strength = getPasswordStrength(password);
   const passwordsMatch = confirm.length > 0 && password === confirm;
@@ -141,26 +140,15 @@ export default function SignupPage() {
 
     if (eErr || pErr || cErr) return;
 
-    setServerError(null);
-    setSuccessMessage(null);
     registerMutate(
       { email: email.trim(), password },
       {
         onSuccess: () => {
-          setSuccessMessage(
-            "Account created! Check your inbox to verify your email before signing in."
-          );
-          // Reset form
+          setSubmitted(true);
           setEmail("");
           setPassword("");
           setConfirm("");
           setTouched({});
-        },
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-            ?? "Something went wrong. Please try again.";
-          setServerError(msg);
         },
       }
     );
@@ -251,7 +239,7 @@ export default function SignupPage() {
 
       {/* Card */}
       <div
-        className="relative z-10 w-full max-w-md mx-4"
+        className="auth-card relative z-10 w-full max-w-md mx-4"
         style={{
           background: "rgba(22,27,34,0.75)",
           backdropFilter: "blur(24px) saturate(1.5)",
@@ -447,50 +435,19 @@ export default function SignupPage() {
             {confirmError && <FieldError id="signup-confirm-error" message={confirmError} />}
           </div>
 
-          {/* Server error */}
-          {serverError && (
-            <div
-              role="alert"
-              className="flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm"
-              style={{
-                background: "rgba(191,97,106,0.1)",
-                border: "1px solid rgba(191,97,106,0.25)",
-                color: "#bf616a",
-              }}
-            >
-              <ErrorIcon />
-              <span>{serverError}</span>
-            </div>
-          )}
 
-          {/* Success message */}
-          {successMessage && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm"
-              style={{
-                background: "rgba(163,190,140,0.1)",
-                border: "1px solid rgba(163,190,140,0.25)",
-                color: "#a3be8c",
-              }}
-            >
-              <CheckIcon />
-              <span>{successMessage}</span>
-            </div>
-          )}
 
           {/* Submit */}
           <button
             id="signup-submit"
             type="submit"
-            disabled={isPending || !!successMessage}
+            disabled={isPending || submitted}
             className="w-full py-3 rounded-xl text-[#0f1117] text-sm font-semibold transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a3be8c]/60 mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{
               background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
             }}
             onMouseEnter={e => {
-              if (isPending || successMessage) return;
+              if (isPending || submitted) return;
               (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)";
               (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(163,190,140,0.25)";
             }}
@@ -499,7 +456,7 @@ export default function SignupPage() {
               (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
             }}
             onMouseDown={e => {
-              if (isPending || successMessage) return;
+              if (isPending || submitted) return;
               (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.975)";
             }}
             onMouseUp={e => {

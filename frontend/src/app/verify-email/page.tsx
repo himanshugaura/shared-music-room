@@ -152,7 +152,7 @@ function VerifyEmailContent() {
 
       {/* Card */}
       <div
-        className="relative z-10 w-full max-w-md mx-4 text-center"
+        className="auth-card relative z-10 w-full max-w-md mx-4 text-center"
         style={{
           background: "rgba(22,27,34,0.75)",
           backdropFilter: "blur(24px) saturate(1.5)",

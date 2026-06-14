@@ -72,7 +72,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
-  const [serverError, setServerError] = useState<string | null>(null);
 
   // Error state — only shown after blur or submit
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -97,7 +96,6 @@ export default function LoginPage() {
 
     if (eErr || pErr) return;
 
-    setServerError(null);
     loginMutate(
       { email: email.trim(), password },
       {
@@ -109,12 +107,6 @@ export default function LoginPage() {
           } else {
             router.replace("/dashboard");
           }
-        },
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-            ?? "Something went wrong. Please try again.";
-          setServerError(msg);
         },
       }
     );
@@ -194,7 +186,7 @@ export default function LoginPage() {
 
       {/* Card */}
       <div
-        className="relative z-10 w-full max-w-md mx-4"
+        className="auth-card relative z-10 w-full max-w-md mx-4"
         style={{
           background: "rgba(22,27,34,0.75)",
           backdropFilter: "blur(24px) saturate(1.5)",
@@ -333,21 +325,7 @@ export default function LoginPage() {
             )}
           </div>
 
-          {/* Server-level error */}
-          {serverError && (
-            <div
-              role="alert"
-              className="flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm"
-              style={{
-                background: "rgba(191,97,106,0.1)",
-                border: "1px solid rgba(191,97,106,0.25)",
-                color: "#bf616a",
-              }}
-            >
-              <ErrorIcon />
-              <span>{serverError}</span>
-            </div>
-          )}
+
 
           {/* Submit */}
           <button
