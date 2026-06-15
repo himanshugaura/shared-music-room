@@ -6,6 +6,7 @@ import {
   updateQueueSettingsService,
   voteOnTrack,
 } from '../services/musicQueue.service.js';
+import { getIO } from '../socket/index.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import type { AddTrackBody, UpdateQueueSettingsBody, VoteBody } from '../validations/queue.validations.js';
@@ -30,6 +31,8 @@ export const addTrack = asyncHandler(async (req: Request, res: Response) => {
     thumbnail: thumbnail ?? null,
     durationMs,
   });
+
+  getIO().to(roomId).emit('queue:song_added', { roomId, song });
 
   return new ApiResponse(201, song, 'Track added to queue').send(res);
 });

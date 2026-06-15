@@ -1,12 +1,7 @@
 import type { Server } from 'socket.io';
-import {
-  advanceToNextSong,
-  findMusicQueueByRoomId,
-  setQueuePaused,
-  setQueuePlaying,
-  setQueueSeek,
-} from '../../repositories/musicQueue.repository.js';
+import { findMusicQueueByRoomId, advanceToNextSong, setQueuePaused, setQueuePlaying, setQueueSeek } from '../../repositories/musicQueue.repository.js';
 import { findSongWithQueue } from '../../repositories/queueSong.repository.js';
+import { findRoomOwnerById } from '../../repositories/room.repository.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type RoomPayload = { roomId: string };
@@ -17,6 +12,12 @@ type SkipPayload = { roomId: string; currentSongId: string };
 export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket): void => {
   socket.on('player:play', async ({ roomId }: RoomPayload, ack?: (res: AckResponse) => void) => {
     try {
+      const room = await findRoomOwnerById(roomId);
+      if (!room || room.ownerId !== socket.user.id) {
+        ack?.({ ok: false, message: 'Forbidden' });
+        return;
+      }
+
       const queue = await findMusicQueueByRoomId(roomId);
 
       if (!queue) {
@@ -41,6 +42,12 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
       ack?: (res: AckResponse) => void,
     ) => {
       try {
+        const room = await findRoomOwnerById(roomId);
+        if (!room || room.ownerId !== socket.user.id) {
+          ack?.({ ok: false, message: 'Forbidden' });
+          return;
+        }
+
         const queue = await findMusicQueueByRoomId(roomId);
 
         if (!queue) {
@@ -63,6 +70,12 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
     'player:seek',
     async ({ roomId, positionMs }: SeekPayload, ack?: (res: AckResponse) => void) => {
       try {
+        const room = await findRoomOwnerById(roomId);
+        if (!room || room.ownerId !== socket.user.id) {
+          ack?.({ ok: false, message: 'Forbidden' });
+          return;
+        }
+
         const queue = await findMusicQueueByRoomId(roomId);
 
         if (!queue) {
@@ -88,6 +101,12 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
       ack?: (res: AckResponse<{ nextSongId: string | null }>) => void,
     ) => {
       try {
+        const room = await findRoomOwnerById(roomId);
+        if (!room || room.ownerId !== socket.user.id) {
+          ack?.({ ok: false, message: 'Forbidden' });
+          return;
+        }
+
         const songWithQueue = await findSongWithQueue(currentSongId);
 
         if (!songWithQueue || songWithQueue.queue.roomId !== roomId) {
