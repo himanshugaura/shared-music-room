@@ -101,6 +101,7 @@ export function PlayerPanel({
           iv_load_policy: 3,
           enablejsapi: 1,
           playsinline: 1,
+          disablekb: 1,
           origin: typeof window !== "undefined" ? window.location.origin : "http://localhost:3000",
         },
         events: {
@@ -214,7 +215,7 @@ export function PlayerPanel({
       {/* ── YouTube embed ─────────────────────────────────────────────── */}
       <div style={{ position: "relative", flex: 1, background: "#000", minHeight: 0 }}>
         {/* Isolated container to prevent React DOM errors when YT replaces the child */}
-        <div style={{ width: "100%", height: "100%", pointerEvents: isOwner ? "auto" : "none" }}>
+        <div style={{ width: "100%", height: "100%", pointerEvents: "none" }}>
           <div id={playerContainerId} style={{ width: "100%", height: "100%" }} />
         </div>
 
