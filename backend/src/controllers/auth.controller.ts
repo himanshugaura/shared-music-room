@@ -20,7 +20,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const ACCESS_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: IS_PRODUCTION,
-  sameSite: 'lax',
+  sameSite: IS_PRODUCTION ? 'none' : 'lax',
   maxAge: 15 * 60 * 1000,
   path: '/',
 };
@@ -28,7 +28,7 @@ const ACCESS_COOKIE_OPTIONS: CookieOptions = {
 const REFRESH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: IS_PRODUCTION,
-  sameSite: 'lax',
+  sameSite: IS_PRODUCTION ? 'none' : 'lax',
   maxAge: 30 * 24 * 60 * 60 * 1000,
   path: '/',
 };
@@ -36,7 +36,7 @@ const REFRESH_COOKIE_OPTIONS: CookieOptions = {
 const CLEAR_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: IS_PRODUCTION,
-  sameSite: 'lax',
+  sameSite: IS_PRODUCTION ? 'none' : 'lax',
   path: '/',
 };
 
