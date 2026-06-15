@@ -51,10 +51,9 @@ export function useAddTrack(roomId: string) {
   return useMutation({
     mutationFn: (payload: AddTrackPayload) => roomService.addTrack(roomId, payload),
     onSuccess: (song) => {
-      // Optimistic append — socket event may also arrive; de-duplication is
-      // handled in useRoomSocket.
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
         if (!prev) return prev;
+        if (prev.songs.some((s) => s.id === song.id)) return prev;
         const isFirst = prev.songs.length === 0;
         return {
           ...prev,
