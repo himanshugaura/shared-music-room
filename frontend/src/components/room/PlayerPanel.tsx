@@ -77,6 +77,7 @@ export function PlayerPanel({
   const [isDragging, setIsDragging] = useState(false);
   const [dragSec, setDragSec] = useState(0);
   const [buffering, setBuffering] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
@@ -180,6 +181,17 @@ export function PlayerPanel({
     }
   }, [isPlaying, onPause, onPlay]);
 
+  const handleToggleMute = useCallback(() => {
+    if (!ytRef.current) return;
+    if (isMuted) {
+      ytRef.current.unMute();
+      setIsMuted(false);
+    } else {
+      ytRef.current.mute();
+      setIsMuted(true);
+    }
+  }, [isMuted]);
+
   const handleSeekCommit = useCallback((sec: number) => {
     ytRef.current?.seekTo(sec, true);
     setCurrentSec(sec);
@@ -201,7 +213,7 @@ export function PlayerPanel({
       {/* ── YouTube embed ─────────────────────────────────────────────── */}
       <div style={{ position: "relative", flex: 1, background: "#000", minHeight: 0 }}>
         {/* Isolated container to prevent React DOM errors when YT replaces the child */}
-        <div style={{ width: "100%", height: "100%" }}>
+        <div style={{ width: "100%", height: "100%", pointerEvents: isOwner ? "auto" : "none" }}>
           <div id={playerContainerId} style={{ width: "100%", height: "100%" }} />
         </div>
 
@@ -280,7 +292,7 @@ export function PlayerPanel({
         </div>
 
         {/* Owner-only controls */}
-        {isOwner && (
+        {isOwner ? (
           <>
             {/* Seek bar */}
             <div style={{ marginBottom: 14, position: "relative" }}>
@@ -385,6 +397,38 @@ export function PlayerPanel({
               </button>
             </div>
           </>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 16 }}>
+            {/* Mute Button for members */}
+            <button
+              onClick={handleToggleMute}
+              title={isMuted ? "Unmute" : "Mute"}
+              style={{
+                width: 42, height: 42, borderRadius: "50%",
+                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.04)",
+                color: "#d8dee9",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+                transition: "background 0.12s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.1)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)"; }}
+            >
+              {isMuted ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <line x1="23" y1="9" x2="17" y2="15"></line>
+                  <line x1="17" y1="9" x2="23" y2="15"></line>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                </svg>
+              )}
+            </button>
+          </div>
         )}
       </div>
     </section>
