@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Room, QueueState } from "@/types/room";
-import { useUpdateQueueSettings } from "@/hooks/useRoom";
 
 interface Props {
   room: Room;
@@ -15,7 +14,6 @@ interface Props {
 
 export function RoomHeader({ room, queue, isOwner, onlineCount }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
-  const { mutate: updateSettings, isPending: shufflePending } = useUpdateQueueSettings(room.id);
 
   function copyCode() {
     navigator.clipboard.writeText(room.roomCode).then(() => {
@@ -111,39 +109,6 @@ export function RoomHeader({ room, queue, isOwner, onlineCount }: Props) {
         </svg>
         {room.roomCode}
       </button>
-
-      {/* Shuffle (owner only) */}
-      {isOwner && queue && (
-        <button
-          onClick={() => updateSettings({ shuffleEnabled: !queue.shuffleEnabled })}
-          disabled={shufflePending}
-          title={queue.shuffleEnabled ? "Disable shuffle" : "Enable shuffle"}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "5px 10px",
-            borderRadius: 8,
-            border: `1px solid ${queue.shuffleEnabled ? "rgba(163,190,140,0.4)" : "rgba(255,255,255,0.1)"}`,
-            background: queue.shuffleEnabled ? "rgba(163,190,140,0.12)" : "rgba(255,255,255,0.04)",
-            color: queue.shuffleEnabled ? "#a3be8c" : "#6b7a8d",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: shufflePending ? "not-allowed" : "pointer",
-            opacity: shufflePending ? 0.6 : 1,
-            transition: "all 0.15s",
-            flexShrink: 0,
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="16 3 21 3 21 8" />
-            <line x1="4" y1="20" x2="21" y2="3" />
-            <polyline points="21 16 21 21 16 21" />
-            <line x1="15" y1="15" x2="21" y2="21" />
-          </svg>
-          Shuffle
-        </button>
-      )}
     </header>
   );
 }

@@ -189,7 +189,7 @@ export default function CreateRoomModal({ open, onClose }: Props) {
           >
             <div>
               <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#d8dee9" }}>Shuffle mode</p>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d" }}>Play songs in random order</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d" }}>it shuffles queue based on votes</p>
             </div>
             <div
               style={{

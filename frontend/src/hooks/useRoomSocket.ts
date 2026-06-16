@@ -98,11 +98,23 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         });
       };
 
+      const onSongVoted = ({ song }: { song: QueueSong }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+          
+          return {
+            ...prev,
+            songs: prev.songs.map((s) => s.id === song.id ? { ...s, upVotes: song.upVotes, downVotes: song.downVotes, voteScore: song.voteScore } : s),
+          };
+        });
+      };
+
       socket.on("player:play", onPlay);
       socket.on("player:pause", onPause);
       socket.on("player:seek", onSeek);
       socket.on("player:skip", onSkip);
       socket.on("queue:song_added", onSongAdded);
+      socket.on("queue:song_voted", onSongVoted);
 
       // ── Cleanup ────────────────────────────────────────────────────────────
 
@@ -113,6 +125,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         socket.off("player:seek", onSeek);
         socket.off("player:skip", onSkip);
         socket.off("queue:song_added", onSongAdded);
+        socket.off("queue:song_voted", onSongVoted);
       };
     });
 

@@ -57,11 +57,13 @@ export const updateQueueSettings = asyncHandler(async (req: Request, res: Respon
 });
 
 export const voteTrack = asyncHandler(async (req: Request, res: Response) => {
-  const { songId } = req.params as { songId: string };
+  const { roomId, songId } = req.params as { roomId: string; songId: string };
   const userId = req.user!.id;
   const { voteType } = req.body as VoteBody;
 
   const song = await voteOnTrack(songId, userId, voteType);
+
+  getIO().to(roomId).emit('queue:song_voted', { song });
 
   return new ApiResponse(200, song, 'Vote recorded').send(res);
 });
