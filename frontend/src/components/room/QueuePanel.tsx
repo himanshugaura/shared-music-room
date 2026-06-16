@@ -16,7 +16,8 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
   const [addOpen, setAddOpen] = useState(false);
 
   const songs = queue?.songs ?? [];
-  const sorted = [...songs].sort((a, b) => a.position - b.position);
+  const filtered = songs.filter(song => song.id !== queue?.currentQueueSongId);
+  const sorted = [...filtered].sort((a, b) => a.position - b.position);
 
   return (
     <aside
@@ -44,7 +45,7 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
             Queue
           </h2>
           <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d" }}>
-            {songs.length} {songs.length === 1 ? "track" : "tracks"}
+            {filtered.length} {filtered.length === 1 ? "track" : "tracks"}
           </p>
         </div>
 

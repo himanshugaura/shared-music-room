@@ -39,10 +39,12 @@ export const addTrack = asyncHandler(async (req: Request, res: Response) => {
 
 
 export const removeTrack = asyncHandler(async (req: Request, res: Response) => {
-  const { songId } = req.params as { songId: string };
+  const { roomId, songId } = req.params as { roomId: string; songId: string };
   const userId = req.user!.id;
 
   await removeTrackFromQueueService(songId, userId);
+
+  getIO().to(roomId).emit('queue:song_deleted', { songId });
 
   return new ApiResponse(200, null, 'Track removed from queue').send(res);
 });
