@@ -30,7 +30,7 @@ import type { QueueState } from "@/types/room";
 function calcPosition(q: QueueState): number {
   if (!q.isPlaying || !q.playbackStartedAt) return q.currentPositionMs / 1000;
   const elapsed = Date.now() - new Date(q.playbackStartedAt).getTime();
-  return (q.currentPositionMs + elapsed) / 1000;
+  return Math.max(0, (q.currentPositionMs + elapsed) / 1000);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
       if (nextSongId) {
         const song = queue?.songs.find((s) => s.id === nextSongId);
         if (song) {
-          const lag = (Date.now() - serverAt) / 1000;
+          const lag = Math.max(0, (Date.now() - serverAt) / 1000);
           controlRef.current?.loadVideo(song.youtubeVideoId, lag);
         }
       } else {
