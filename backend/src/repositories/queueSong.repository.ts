@@ -89,53 +89,26 @@ export const findSongWithQueue = async (
   });
 };
 
-
 export const upsertVote = async (
   queueSongId: string,
   userId: string,
   voteType: 'up' | 'down',
 ): Promise<QueueSongWithUser> => {
   return prisma.$transaction(async (tx) => {
-    const existingVote = await tx.songVote.findUnique({
-      where: { queueSongId_userId: { queueSongId, userId } },
-    });
-
-    if (existingVote && existingVote.voteType === voteType) {
-      return tx.queueSong.findUniqueOrThrow({
-        where: { id: queueSongId },
-        include: includeAddedBy,
-      });
-    }
-
     await tx.songVote.upsert({
       where: { queueSongId_userId: { queueSongId, userId } },
       create: { queueSongId, userId, voteType },
       update: { voteType },
     });
 
-    let upVotesIncrement = 0;
-    let downVotesIncrement = 0;
-
-    if (!existingVote) {
-      if (voteType === 'up') upVotesIncrement = 1;
-      else downVotesIncrement = 1;
-    } else {
-      if (voteType === 'up') {
-        upVotesIncrement = 1;
-        downVotesIncrement = -1;
-      } else {
-        upVotesIncrement = -1;
-        downVotesIncrement = 1;
-      }
-    }
+    const [upVotes, downVotes] = await Promise.all([
+      tx.songVote.count({ where: { queueSongId, voteType: 'up' } }),
+      tx.songVote.count({ where: { queueSongId, voteType: 'down' } }),
+    ]);
 
     return tx.queueSong.update({
       where: { id: queueSongId },
-      data: {
-        upVotes: { increment: upVotesIncrement },
-        downVotes: { increment: downVotesIncrement },
-        voteScore: { increment: upVotesIncrement - downVotesIncrement },
-      },
+      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
       include: includeAddedBy,
     });
   });
@@ -146,31 +119,18 @@ export const deleteVote = async (
   userId: string,
 ): Promise<QueueSongWithUser> => {
   return prisma.$transaction(async (tx) => {
-    const existingVote = await tx.songVote.findUnique({
-      where: { queueSongId_userId: { queueSongId, userId } },
-    });
-
-    if (!existingVote) {
-      return tx.queueSong.findUniqueOrThrow({
-        where: { id: queueSongId },
-        include: includeAddedBy,
-      });
-    }
-
     await tx.songVote.delete({
       where: { queueSongId_userId: { queueSongId, userId } },
     });
 
-    const upVotesIncrement = existingVote.voteType === 'up' ? -1 : 0;
-    const downVotesIncrement = existingVote.voteType === 'down' ? -1 : 0;
+    const [upVotes, downVotes] = await Promise.all([
+      tx.songVote.count({ where: { queueSongId, voteType: 'up' } }),
+      tx.songVote.count({ where: { queueSongId, voteType: 'down' } }),
+    ]);
 
     return tx.queueSong.update({
       where: { id: queueSongId },
-      data: {
-        upVotes: { increment: upVotesIncrement },
-        downVotes: { increment: downVotesIncrement },
-        voteScore: { increment: upVotesIncrement - downVotesIncrement },
-      },
+      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
       include: includeAddedBy,
     });
   });
