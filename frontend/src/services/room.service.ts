@@ -32,8 +32,17 @@ export const roomService = {
     await api.post(`${BASE}/rooms/join/${roomCode.trim().toUpperCase()}`);
   },
 
+  joinById: async (roomId: string): Promise<void> => {
+    await api.post(`${BASE}/rooms/${roomId}/join`);
+  },
+
   deleteRoom: async (roomId: string): Promise<void> => {
     await api.delete(`${BASE}/rooms/${roomId}`);
+  },
+
+  getPublicRooms: async (): Promise<RoomSummary[]> => {
+    const { data } = await api.get(`${BASE}/rooms/public`);
+    return data.data;
   },
 
   // ── Room page ─────────────────────────────────────────────────────────────

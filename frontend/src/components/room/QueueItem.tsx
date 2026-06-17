@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRemoveTrack, useVoteTrack } from "@/hooks/useRoom";
 import type { QueueSong } from "@/types/room";
 
@@ -17,17 +17,17 @@ interface Props {
   isOwner: boolean;
 }
 
-export function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: Props) {
+export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: Props) {
   const { mutate: removeTrack, isPending: removing } = useRemoveTrack(roomId);
   const { mutate: vote, isPending: voting } = useVoteTrack(roomId);
 
-  // Local vote tracking so the button highlights immediately
-  const [myVote, setMyVote] = useState<"up" | "down" | null>(null);
-
   function handleVote(type: "up" | "down") {
-    const next: "up" | "down" | "remove" = myVote === type ? "remove" : type;
-    setMyVote(next === "remove" ? null : next);
-    vote({ songId: song.id, voteType: next });
+    const prevVote = song.userVote ?? null;
+    const next: "up" | "down" | "remove" = prevVote === type ? "remove" : type;
+    vote({
+      songId: song.id,
+      voteType: next,
+    });
   }
 
   const canRemove = isOwner || song.addedById === currentUserId;
@@ -96,7 +96,17 @@ export function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: P
         }}>
           {song.title}
         </p>
-        <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d" }}>{fmtMs(song.durationMs)}</p>
+        <div style={{ display: "flex", alignItems: "center", marginTop: 2 }}>
+          <p style={{ margin: 0, fontSize: 11, color: "#6b7a8d" }}>{fmtMs(song.durationMs)}</p>
+          {song.addedBy && (
+            <>
+              <span style={{ margin: "0 6px", fontSize: 11, color: "#4c566a" }}>•</span>
+              <p style={{ margin: 0, fontSize: 11, color: "#81a1c1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                Added by {song.addedBy.name || song.addedBy.username || "Unknown"}
+              </p>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Vote score */}
@@ -112,9 +122,10 @@ export function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: P
           title="Upvote"
           style={{
             padding: "4px 7px", borderRadius: 6, border: "none", cursor: "pointer",
-            background: myVote === "up" ? "rgba(163,190,140,0.25)" : "rgba(255,255,255,0.04)",
-            color: myVote === "up" ? "#a3be8c" : "#6b7a8d",
+            background: song.userVote === "up" ? "rgba(163,190,140,0.25)" : "rgba(255,255,255,0.04)",
+            color: song.userVote === "up" ? "#a3be8c" : "#6b7a8d",
             fontSize: 13, transition: "all 0.12s",
+            opacity: voting ? 0.5 : 1,
           }}
         >
           ▲
@@ -125,9 +136,10 @@ export function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: P
           title="Downvote"
           style={{
             padding: "4px 7px", borderRadius: 6, border: "none", cursor: "pointer",
-            background: myVote === "down" ? "rgba(191,97,106,0.2)" : "rgba(255,255,255,0.04)",
-            color: myVote === "down" ? "#bf616a" : "#6b7a8d",
+            background: song.userVote === "down" ? "rgba(191,97,106,0.2)" : "rgba(255,255,255,0.04)",
+            color: song.userVote === "down" ? "#bf616a" : "#6b7a8d",
             fontSize: 13, transition: "all 0.12s",
+            opacity: voting ? 0.5 : 1,
           }}
         >
           ▼
@@ -160,4 +172,4 @@ export function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: P
       )}
     </div>
   );
-}
+});

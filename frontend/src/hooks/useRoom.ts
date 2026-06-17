@@ -95,10 +95,15 @@ export function useVoteTrack(roomId: string) {
       songId: string;
       voteType: "up" | "down" | "remove";
     }) => roomService.voteTrack(roomId, songId, voteType),
-    onSuccess: (updated: QueueSong) => {
+    onSuccess: (updated: QueueSong, variables) => {
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) =>
         prev
-          ? { ...prev, songs: prev.songs.map((s) => (s.id === updated.id ? updated : s)) }
+          ? {
+              ...prev,
+              songs: prev.songs
+                .map((s) => (s.id === updated.id ? { ...updated, userVote: variables.voteType === "remove" ? null : variables.voteType } : s))
+                .sort((a, b) => b.voteScore - a.voteScore || a.position - b.position)
+            }
           : prev
       );
     },

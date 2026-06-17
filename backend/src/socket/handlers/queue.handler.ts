@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import type { QueueSong } from '@prisma/client';
+import { type QueueSongWithUser } from '../../repositories/queueSong.repository.js';
 import { addTrackToQueue } from '../../repositories/queueSong.repository.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
@@ -20,7 +20,7 @@ export const registerQueueHandlers = (io: Server, socket: AuthenticatedSocket): 
     'queue:song_add',
     async (
       { roomId, track }: QueueSongAddPayload,
-      ack?: (res: AckResponse<QueueSong>) => void,
+      ack?: (res: AckResponse<QueueSongWithUser>) => void,
     ) => {
       try {
         const song = await addTrackToQueue(roomId, {

@@ -14,8 +14,9 @@ import type { AddTrackBody, UpdateQueueSettingsBody, VoteBody } from '../validat
 
 export const getQueue = asyncHandler(async (req: Request, res: Response) => {
   const { roomId } = req.params as { roomId: string };
+  const userId = req.user?.id;
 
-  const queue = await getQueueState(roomId);
+  const queue = await getQueueState(roomId, userId);
 
   return new ApiResponse(200, queue, 'Queue fetched successfully').send(res);
 });
@@ -55,6 +56,11 @@ export const updateQueueSettings = asyncHandler(async (req: Request, res: Respon
 
   const queue = await updateQueueSettingsService(roomId, body);
 
+  if (body.shuffleEnabled !== undefined) {
+    const queueState = await getQueueState(roomId);
+    getIO().to(roomId).emit('queueUpdated', { queue: queueState });
+  }
+
   return new ApiResponse(200, queue, 'Queue settings updated').send(res);
 });
 
@@ -64,8 +70,13 @@ export const voteTrack = asyncHandler(async (req: Request, res: Response) => {
   const { voteType } = req.body as VoteBody;
 
   const song = await voteOnTrack(songId, userId, voteType);
+  const queueState = await getQueueState(roomId);
 
-  getIO().to(roomId).emit('queue:song_voted', { song });
+  if (queueState.shuffleEnabled) {
+    getIO().to(roomId).emit('queueUpdated', { queue: queueState });
+  } else {
+    getIO().to(roomId).emit('queue:song_voted', { song });
+  }
 
   return new ApiResponse(200, song, 'Vote recorded').send(res);
 });

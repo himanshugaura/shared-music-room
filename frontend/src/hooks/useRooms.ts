@@ -12,6 +12,7 @@ function extractMessage(err: unknown, fallback: string): string {
 const KEYS = {
   owned: ["rooms", "owned"] as const,
   joined: ["rooms", "joined"] as const,
+  public: ["rooms", "public"] as const,
 };
 
 export function useOwnedRooms() {
@@ -29,6 +30,14 @@ export function useJoinedRooms() {
       const res = await roomService.getJoinedRooms();
       return res.member;
     },
+    staleTime: 30_000,
+  });
+}
+
+export function usePublicRooms() {
+  return useQuery({
+    queryKey: KEYS.public,
+    queryFn: roomService.getPublicRooms,
     staleTime: 30_000,
   });
 }
@@ -57,6 +66,20 @@ export function useJoinByCode() {
     },
     onError: (err: unknown) => {
       toast.error(extractMessage(err, "Could not join room. Check the code and try again."));
+    },
+  });
+}
+
+export function useJoinRoomById() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (roomId: string) => roomService.joinById(roomId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.joined });
+      toast.success("Successfully joined the room!");
+    },
+    onError: (err: unknown) => {
+      toast.error(extractMessage(err, "Could not join room. You might already be a member."));
     },
   });
 }

@@ -70,11 +70,23 @@ export const advanceToNextSong = async (
   currentPosition: number,
 ): Promise<MusicQueue | null> => {
   return prisma.$transaction(async (tx) => {
-    const nextSong = await tx.queueSong.findFirst({
-      where: { queueId, position: { gt: currentPosition } },
-      orderBy: { position: 'asc' },
-      select: { id: true },
-    });
+    const queue = await tx.musicQueue.findUnique({ where: { id: queueId } });
+    if (!queue) return null;
+
+    let nextSong;
+    if (queue.shuffleEnabled) {
+      nextSong = await tx.queueSong.findFirst({
+        where: { queueId, position: { gt: currentPosition } },
+        orderBy: [{ voteScore: 'desc' }, { position: 'asc' }],
+        select: { id: true },
+      });
+    } else {
+      nextSong = await tx.queueSong.findFirst({
+        where: { queueId, position: { gt: currentPosition } },
+        orderBy: { position: 'asc' },
+        select: { id: true },
+      });
+    }
 
     await tx.queueSong.deleteMany({
       where: { queueId, position: { lte: currentPosition } },

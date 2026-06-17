@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { QueueItem } from "./QueueItem";
 import { AddSongModal } from "./AddSongModal";
 import type { QueueState } from "@/types/room";
@@ -15,9 +15,12 @@ interface Props {
 export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
   const [addOpen, setAddOpen] = useState(false);
 
-  const songs = queue?.songs ?? [];
-  const filtered = songs.filter(song => song.id !== queue?.currentQueueSongId);
-  const sorted = [...filtered].sort((a, b) => a.position - b.position);
+  const filteredAndSorted = useMemo(() => {
+    const songs = queue?.songs ?? [];
+    return songs.filter((song) => song.id !== queue?.currentQueueSongId);
+    // Note: We no longer manually sort here because the backend sends them perfectly ordered 
+    // according to whether shuffle (voting order) is enabled or not.
+  }, [queue?.songs, queue?.currentQueueSongId]);
 
   return (
     <aside
@@ -45,7 +48,7 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
             Queue
           </h2>
           <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d" }}>
-            {filtered.length} {filtered.length === 1 ? "track" : "tracks"}
+            {filteredAndSorted.length} {filteredAndSorted.length === 1 ? "track" : "tracks"}
           </p>
         </div>
 
@@ -78,7 +81,7 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
 
       {/* Song list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-        {sorted.length === 0 ? (
+        {filteredAndSorted.length === 0 ? (
           <div
             style={{
               display: "flex",
@@ -104,7 +107,7 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {sorted.map((song) => (
+            {filteredAndSorted.map((song) => (
               <QueueItem
                 key={song.id}
                 song={song}

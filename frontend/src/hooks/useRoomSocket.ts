@@ -109,6 +109,10 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         });
       };
 
+      const onQueueUpdated = ({ queue }: { queue: QueueState }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), queue);
+      };
+
       const onSongDeleted = ({ songId }: { songId: string }) => {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
@@ -125,6 +129,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       socket.on("player:skip", onSkip);
       socket.on("queue:song_added", onSongAdded);
       socket.on("queue:song_voted", onSongVoted);
+      socket.on("queueUpdated", onQueueUpdated);
       socket.on("queue:song_deleted", onSongDeleted);
 
       // ── Cleanup ────────────────────────────────────────────────────────────
@@ -137,6 +142,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         socket.off("player:skip", onSkip);
         socket.off("queue:song_added", onSongAdded);
         socket.off("queue:song_voted", onSongVoted);
+        socket.off("queueUpdated", onQueueUpdated);
         socket.off("queue:song_deleted", onSongDeleted);
       };
     });

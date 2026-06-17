@@ -6,6 +6,7 @@ import type { RoomSummary } from "../types/room.types.js";
 const ROOM_SUMMARY_SELECT = {
   id: true,
   name: true,
+  description: true,
   roomCode: true,
   visibility: true,
   createdAt: true,

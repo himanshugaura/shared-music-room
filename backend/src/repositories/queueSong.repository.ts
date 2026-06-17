@@ -1,5 +1,13 @@
-import type { QueueSong } from '@prisma/client';
+import { Prisma, type QueueSong } from '@prisma/client';
 import { findMusicQueueByRoomId } from './musicQueue.repository.js';
+
+export type QueueSongWithUser = Prisma.QueueSongGetPayload<{
+  include: { addedBy: { select: { username: true, name: true, avatarUrl: true } } }
+}>;
+
+const includeAddedBy = {
+  addedBy: { select: { username: true, name: true, avatarUrl: true } },
+};
 import { ApiError } from '../utils/apiError.js';
 import { prisma } from '../config/prisma.js';
 
@@ -12,7 +20,7 @@ export const addTrackToQueue = async (
     durationMs: number;
     addedById: string;
   },
-): Promise<QueueSong> => {
+): Promise<QueueSongWithUser> => {
   const musicQueue = await findMusicQueueByRoomId(roomId);
 
   if (!musicQueue) {
@@ -38,6 +46,7 @@ export const addTrackToQueue = async (
       position: nextPosition,
       addedById: trackData.addedById,
     },
+    include: includeAddedBy,
   });
 
   if (isFirstSong) {
@@ -55,50 +64,79 @@ export const addTrackToQueue = async (
   return newSong;
 };
 
-export const findSongsByQueueId = async (queueId: string): Promise<QueueSong[]> => {
+export const findSongsByQueueId = async (queueId: string): Promise<QueueSongWithUser[]> => {
   return prisma.queueSong.findMany({
     where: { queueId },
     orderBy: { position: 'asc' },
+    include: includeAddedBy,
   });
 };
 
-export const findSongById = async (songId: string): Promise<QueueSong | null> => {
-  return prisma.queueSong.findUnique({ where: { id: songId } });
+export const findSongById = async (songId: string): Promise<QueueSongWithUser | null> => {
+  return prisma.queueSong.findUnique({ where: { id: songId }, include: includeAddedBy });
 };
 
-export const removeTrackFromQueue = async (songId: string): Promise<QueueSong> => {
-  return prisma.queueSong.delete({ where: { id: songId } });
+export const removeTrackFromQueue = async (songId: string): Promise<QueueSongWithUser> => {
+  return prisma.queueSong.delete({ where: { id: songId }, include: includeAddedBy });
 };
 
 export const findSongWithQueue = async (
   songId: string,
-): Promise<(QueueSong & { queue: { id: string; roomId: string } }) | null> => {
+): Promise<(QueueSongWithUser & { queue: { id: string; roomId: string } }) | null> => {
   return prisma.queueSong.findUnique({
     where: { id: songId },
-    include: { queue: { select: { id: true, roomId: true } } },
+    include: { queue: { select: { id: true, roomId: true } }, ...includeAddedBy },
   });
 };
+
 
 export const upsertVote = async (
   queueSongId: string,
   userId: string,
   voteType: 'up' | 'down',
-): Promise<QueueSong> => {
+): Promise<QueueSongWithUser> => {
   return prisma.$transaction(async (tx) => {
+    const existingVote = await tx.songVote.findUnique({
+      where: { queueSongId_userId: { queueSongId, userId } },
+    });
+
+    if (existingVote && existingVote.voteType === voteType) {
+      return tx.queueSong.findUniqueOrThrow({
+        where: { id: queueSongId },
+        include: includeAddedBy,
+      });
+    }
+
     await tx.songVote.upsert({
       where: { queueSongId_userId: { queueSongId, userId } },
       create: { queueSongId, userId, voteType },
       update: { voteType },
     });
 
-    const [upVotes, downVotes] = await Promise.all([
-      tx.songVote.count({ where: { queueSongId, voteType: 'up' } }),
-      tx.songVote.count({ where: { queueSongId, voteType: 'down' } }),
-    ]);
+    let upVotesIncrement = 0;
+    let downVotesIncrement = 0;
+
+    if (!existingVote) {
+      if (voteType === 'up') upVotesIncrement = 1;
+      else downVotesIncrement = 1;
+    } else {
+      if (voteType === 'up') {
+        upVotesIncrement = 1;
+        downVotesIncrement = -1;
+      } else {
+        upVotesIncrement = -1;
+        downVotesIncrement = 1;
+      }
+    }
 
     return tx.queueSong.update({
       where: { id: queueSongId },
-      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
+      data: {
+        upVotes: { increment: upVotesIncrement },
+        downVotes: { increment: downVotesIncrement },
+        voteScore: { increment: upVotesIncrement - downVotesIncrement },
+      },
+      include: includeAddedBy,
     });
   });
 };
@@ -106,20 +144,34 @@ export const upsertVote = async (
 export const deleteVote = async (
   queueSongId: string,
   userId: string,
-): Promise<QueueSong> => {
+): Promise<QueueSongWithUser> => {
   return prisma.$transaction(async (tx) => {
+    const existingVote = await tx.songVote.findUnique({
+      where: { queueSongId_userId: { queueSongId, userId } },
+    });
+
+    if (!existingVote) {
+      return tx.queueSong.findUniqueOrThrow({
+        where: { id: queueSongId },
+        include: includeAddedBy,
+      });
+    }
+
     await tx.songVote.delete({
       where: { queueSongId_userId: { queueSongId, userId } },
     });
 
-    const [upVotes, downVotes] = await Promise.all([
-      tx.songVote.count({ where: { queueSongId, voteType: 'up' } }),
-      tx.songVote.count({ where: { queueSongId, voteType: 'down' } }),
-    ]);
+    const upVotesIncrement = existingVote.voteType === 'up' ? -1 : 0;
+    const downVotesIncrement = existingVote.voteType === 'down' ? -1 : 0;
 
     return tx.queueSong.update({
       where: { id: queueSongId },
-      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
+      data: {
+        upVotes: { increment: upVotesIncrement },
+        downVotes: { increment: downVotesIncrement },
+        voteScore: { increment: upVotesIncrement - downVotesIncrement },
+      },
+      include: includeAddedBy,
     });
   });
 };

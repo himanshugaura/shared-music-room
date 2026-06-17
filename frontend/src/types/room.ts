@@ -38,7 +38,13 @@ export interface QueueSong {
   upVotes: number;
   downVotes: number;
   voteScore: number;
+  userVote?: "up" | "down" | null;
   addedById: string;
+  addedBy: {
+    username: string | null;
+    name: string | null;
+    avatarUrl: string | null;
+  };
   addedAt: string;
 }
 

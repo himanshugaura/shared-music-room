@@ -287,8 +287,16 @@ export function PlayerPanel({
             }}>
               {currentSong?.title ?? "—"}
             </p>
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d" }}>
-              {currentSong ? `${fmtSec(currentSec)} / ${fmtSec(duration || currentSong.durationMs / 1000)}` : "No track loaded"}
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7a8d", display: "flex", alignItems: "center" }}>
+              <span>{currentSong ? `${fmtSec(currentSec)} / ${fmtSec(duration || currentSong.durationMs / 1000)}` : "No track loaded"}</span>
+              {currentSong?.addedBy && (
+                <>
+                  <span style={{ margin: "0 6px", color: "#4c566a" }}>•</span>
+                  <span style={{ color: "#81a1c1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    Added by {currentSong.addedBy.name || currentSong.addedBy.username || "Unknown"}
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
