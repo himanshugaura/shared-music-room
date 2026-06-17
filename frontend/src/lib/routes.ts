@@ -7,7 +7,7 @@
 export const GUEST_ONLY_ROUTES = ["/login", "/signup"] as const;
 
 /** Routes only for logged-in but UNVERIFIED users. */
-export const VERIFY_ONLY_ROUTES = ["/verify-mail"] as const;
+export const VERIFY_ONLY_ROUTES = ["/verify-email"] as const;
 
 /** Routes only for logged-in VERIFIED users who have incomplete profiles (no name/username). */
 export const PROFILE_SETUP_ROUTES = ["/profile"] as const;
@@ -23,7 +23,6 @@ export const NO_REDIRECT_ON_AUTH_FAIL = [
   ...VERIFY_ONLY_ROUTES,
   ...PROFILE_SETUP_ROUTES,
   "/",
-  "/verify-email",
 ] as const;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

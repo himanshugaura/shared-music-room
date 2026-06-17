@@ -78,7 +78,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
         router.replace("/profile");
       } else if (loggedIn && !verified) {
         // Unverified users shouldn't be on login/signup either
-        router.replace("/verify-mail");
+        router.replace("/verify-email");
       }
       return;
     }
@@ -102,7 +102,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (!loggedIn) {
         router.replace("/login");
       } else if (!verified) {
-        router.replace("/verify-mail");
+        router.replace("/verify-email");
       }
       // Always allowed to stay — profile page handles both setup and editing
       return;
@@ -113,7 +113,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (!loggedIn) {
         router.replace("/login");
       } else if (!verified) {
-        router.replace("/verify-mail");
+        router.replace("/verify-email");
       } else if (!profileComplete) {
         router.replace("/profile");
       }

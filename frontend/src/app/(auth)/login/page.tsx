@@ -101,7 +101,7 @@ export default function LoginPage() {
       {
         onSuccess: (user) => {
           if (!user.isVerified) {
-            router.replace("/verify-mail");
+            router.replace("/verify-email?auto_resend=true");
           } else if (!user.username) {
             router.replace("/profile");
           } else {

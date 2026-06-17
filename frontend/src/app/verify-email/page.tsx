@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Rubik_Glitch } from "next/font/google";
-import { useVerifyEmail } from "@/hooks/useAuth";
+import { useVerifyEmail, useResendVerification, useLogout } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store";
 
 const glitchFont = Rubik_Glitch({
@@ -14,7 +14,7 @@ const glitchFont = Rubik_Glitch({
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
-function SpinnerIcon() {
+function SpinnerIcon({ dark }: { dark?: boolean }) {
   return (
     <svg
       className="animate-spin"
@@ -24,10 +24,31 @@ function SpinnerIcon() {
       fill="none"
       aria-hidden="true"
     >
-      <circle cx="20" cy="20" r="17" stroke="rgba(163,190,140,0.15)" strokeWidth="3" />
+      <circle cx="20" cy="20" r="17" stroke={dark ? "rgba(0,0,0,0.2)" : "rgba(163,190,140,0.15)"} strokeWidth="3" />
       <path
         d="M20 3 A17 17 0 0 1 37 20"
-        stroke="#a3be8c"
+        stroke={dark ? "#0f1117" : "#a3be8c"}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SmallSpinnerIcon({ dark }: { dark?: boolean }) {
+  return (
+    <svg
+      className="animate-spin"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" stroke={dark ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.15)"} strokeWidth="3" />
+      <path
+        d="M12 2 A10 10 0 0 1 22 12"
+        stroke={dark ? "#0f1117" : "#eceff4"}
         strokeWidth="3"
         strokeLinecap="round"
       />
@@ -74,29 +95,69 @@ function XCircleIcon() {
   );
 }
 
+function MailIcon() {
+  return (
+    <svg
+      width="64"
+      height="64"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#a3be8c"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </svg>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
+  const autoResend = searchParams.get("auto_resend") === "true";
 
   const user = useAuthStore((s) => s.user);
-  const { mutate: verify, isPending, isSuccess, isError, error } = useVerifyEmail();
+  const { mutate: verify, isPending: isVerifying, isSuccess, isError, error } = useVerifyEmail();
+  const { mutate: resend, isPending: isResending } = useResendVerification();
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
 
-  // Fire once on mount — don't re-fire on re-renders
-  const fired = useRef(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  // 1. Verify token if present
+  const verifyFired = useRef(false);
   useEffect(() => {
-    if (fired.current || !token) return;
-    fired.current = true;
+    if (verifyFired.current || !token) return;
+    verifyFired.current = true;
     verify(token);
   }, [token, verify]);
 
-  // After a successful verification, auto-redirect after 2.5 s
+  // 2. Auto resend if requested
+  const resendFired = useRef(false);
+  useEffect(() => {
+    if (resendFired.current || !autoResend || token) return;
+    resendFired.current = true;
+    resend(undefined, {
+      onSuccess: () => setCooldown(60),
+    });
+  }, [autoResend, token, resend]);
+
+  // 3. Cooldown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
+  // 4. Redirect after success
   useEffect(() => {
     if (!isSuccess) return;
     const t = setTimeout(() => {
-      // If no username yet → profile setup, else dashboard
       if (!user?.username) {
         router.replace("/profile");
       } else {
@@ -106,6 +167,14 @@ function VerifyEmailContent() {
     return () => clearTimeout(t);
   }, [isSuccess, user, router]);
 
+  function handleResend() {
+    if (cooldown > 0 || isResending) return;
+    resend(undefined, {
+      onSuccess: () => setCooldown(60),
+    });
+  }
+
+  const isResendDisabled = isResending || cooldown > 0;
   const errorMsg =
     (error as { response?: { data?: { message?: string } } })?.response?.data
       ?.message ?? "This link may be expired or invalid. Please request a new one.";
@@ -176,7 +245,7 @@ function VerifyEmailContent() {
           </Link>
         </div>
 
-        {/* ── No token ── */}
+        {/* ── No token (Check Inbox UI) ── */}
         {!token && (
           <>
             <div className="flex justify-center mb-6">
@@ -185,40 +254,72 @@ function VerifyEmailContent() {
                   width: "96px",
                   height: "96px",
                   borderRadius: "50%",
-                  background: "rgba(191,97,106,0.08)",
-                  border: "1px solid rgba(191,97,106,0.18)",
+                  background: "rgba(163,190,140,0.08)",
+                  border: "1px solid rgba(163,190,140,0.18)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  boxShadow: "0 0 32px rgba(163,190,140,0.12)",
                 }}
               >
-                <XCircleIcon />
+                <MailIcon />
               </div>
             </div>
             <h1
               className="text-2xl font-bold tracking-tight mb-2"
               style={{ color: "#eceff4" }}
             >
-              Invalid link
+              Verify your email
             </h1>
+            {user?.email && (
+              <p className="text-center text-sm font-medium mb-3" style={{ color: "#a3be8c" }}>
+                {user.email}
+              </p>
+            )}
             <p className="text-sm leading-relaxed mb-8" style={{ color: "#6b7a8d" }}>
-              This verification link is missing a token. Please use the link from your email.
+              We sent a verification link to your inbox. Click the link in the email to activate your account.
             </p>
-            <Link
-              href="/verify-mail"
-              className="inline-block w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-[1.015] active:scale-[0.975] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a3be8c]/60"
+
+            {/* Resend button */}
+            <button
+              id="resend-verification-btn"
+              type="button"
+              onClick={handleResend}
+              disabled={isResendDisabled}
+              className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a3be8c]/60 disabled:opacity-60 disabled:cursor-not-allowed mb-3"
               style={{
                 background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
                 color: "#0f1117",
               }}
             >
-              Resend verification email
-            </Link>
+              {isResending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <SmallSpinnerIcon dark />
+                  Sending…
+                </span>
+              ) : cooldown > 0 ? (
+                `Resend in ${cooldown}s`
+              ) : (
+                "Resend verification email"
+              )}
+            </button>
+
+            {/* Sign out link */}
+            <button
+              id="signout-different-account"
+              type="button"
+              onClick={() => logout()}
+              disabled={isLoggingOut}
+              className="w-full py-2.5 rounded-xl text-sm transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:underline disabled:opacity-60"
+              style={{ color: "#6b7a8d", background: "transparent" }}
+            >
+              {isLoggingOut ? "Signing out…" : "Sign in with a different account"}
+            </button>
           </>
         )}
 
         {/* ── Verifying (in-flight) ── */}
-        {token && isPending && (
+        {token && isVerifying && (
           <>
             <div className="flex justify-center mb-6">
               <div
@@ -249,7 +350,7 @@ function VerifyEmailContent() {
         )}
 
         {/* ── Success ── */}
-        {isSuccess && (
+        {token && isSuccess && (
           <>
             <div className="flex justify-center mb-6">
               <div
@@ -291,7 +392,7 @@ function VerifyEmailContent() {
         )}
 
         {/* ── Error ── */}
-        {isError && (
+        {token && isError && (
           <>
             <div className="flex justify-center mb-6">
               <div
@@ -322,7 +423,7 @@ function VerifyEmailContent() {
               {errorMsg}
             </p>
             <Link
-              href="/verify-mail"
+              href="/verify-email"
               className="inline-block w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-[1.015] active:scale-[0.975] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a3be8c]/60"
               style={{
                 background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
@@ -336,12 +437,6 @@ function VerifyEmailContent() {
               href="/login"
               className="block mt-3 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:underline"
               style={{ color: "#6b7a8d" }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLAnchorElement).style.color = "#d8dee9")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLAnchorElement).style.color = "#6b7a8d")
-              }
             >
               Back to sign in
             </Link>
