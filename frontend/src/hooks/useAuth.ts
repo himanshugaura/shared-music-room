@@ -129,8 +129,8 @@ export const useUpdateProfile = () => {
 
 export const useResendVerification = () => {
   return useMutation({
-    mutationFn: () =>
-      api.post(`${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/send-verification`).then((r) => r.data),
+    mutationFn: (email: string) =>
+      api.post(`${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/send-verification`, { email }).then((r) => r.data),
     onSuccess: () => {
       toast.success("Verification email sent! Check your inbox.");
     },

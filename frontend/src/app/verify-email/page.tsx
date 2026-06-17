@@ -140,12 +140,12 @@ function VerifyEmailContent() {
   // 2. Auto resend if requested
   const resendFired = useRef(false);
   useEffect(() => {
-    if (resendFired.current || !autoResend || token) return;
+    if (resendFired.current || !autoResend || token || !user?.email) return;
     resendFired.current = true;
-    resend(undefined, {
+    resend(user.email, {
       onSuccess: () => setCooldown(60),
     });
-  }, [autoResend, token, resend]);
+  }, [autoResend, token, resend, user?.email]);
 
   // 3. Cooldown timer
   useEffect(() => {
@@ -168,8 +168,8 @@ function VerifyEmailContent() {
   }, [isSuccess, user, router]);
 
   function handleResend() {
-    if (cooldown > 0 || isResending) return;
-    resend(undefined, {
+    if (cooldown > 0 || isResending || !user?.email) return;
+    resend(user.email, {
       onSuccess: () => setCooldown(60),
     });
   }
