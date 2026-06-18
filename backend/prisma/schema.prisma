@@ -25,11 +25,10 @@ model User {
   id             String           @id @default(cuid())
   username       String?          @unique
   name           String?
-  email          String           @unique
+  email          String?          @unique
   password       String?
   provider       Provider         @default(local)
   googleId       String?          @unique
-  isVerified     Boolean          @default(false)
   avatarUrl      String?
   avatarPublicId String?
   createdAt      DateTime         @default(now())

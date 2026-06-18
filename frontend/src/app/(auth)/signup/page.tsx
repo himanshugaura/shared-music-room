@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { Rubik_Glitch } from "next/font/google";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import GoogleOAuthButton from "@/components/auth/GoogleLoginButton";
-import { useRegister } from "@/hooks/useAuth";
+import { useRegister, checkUsernameAvailable } from "@/hooks/useAuth";
 
 const glitchFont = Rubik_Glitch({
   subsets: ["latin"],
@@ -47,13 +48,7 @@ function ErrorIcon() {
 
 function FieldError({ message, id }: { message: string; id?: string }) {
   return (
-    <p
-      id={id}
-      className="flex items-center gap-1.5 text-xs mt-1"
-      role="alert"
-      aria-live="polite"
-      style={{ color: "#bf616a" }}
-    >
+    <p id={id} className="flex items-center gap-1.5 text-xs mt-1" role="alert" aria-live="polite" style={{ color: "#bf616a" }}>
       <ErrorIcon />
       {message}
     </p>
@@ -81,11 +76,17 @@ const strengthConfig = {
   strong: { bars: 3, color: "#a3be8c", label: "Strong" },
 };
 
-// --- Validators ---
-function validateEmail(value: string): string {
-  if (!value.trim()) return "Email is required";
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(value.trim())) return "Please enter a valid email address";
+function validateName(value: string): string {
+  if (!value.trim()) return "Name is required";
+  if (value.trim().length > 100) return "Name is too long";
+  return "";
+}
+
+function validateUsername(value: string): string {
+  if (!value.trim()) return "Username is required";
+  if (value.length < 3) return "Username must be at least 3 characters";
+  if (value.length > 30) return "Username must be at most 30 characters";
+  if (!/^[a-zA-Z0-9_]+$/.test(value)) return "Only letters, numbers and underscores";
   return "";
 }
 
@@ -101,27 +102,60 @@ function validateConfirm(value: string, password: string): string {
   return "";
 }
 
-type Fields = "email" | "password" | "confirm";
-type ErrorMap = Partial<Record<Fields, string>>;
+type Fields = "name" | "username" | "password" | "confirm";
 type TouchedMap = Partial<Record<Fields, boolean>>;
 
 export default function SignupPage() {
+  const router = useRouter();
   const { mutate: registerMutate, isPending } = useRegister();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [focused, setFocused] = useState<string | null>(null);
   const [touched, setTouched] = useState<TouchedMap>({});
-  const [submitted, setSubmitted] = useState(false);
+
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameCheckError, setUsernameCheckError] = useState("");
+
+  useEffect(() => {
+    const trimmed = username.trim();
+    if (!trimmed) {
+      setUsernameAvailable(null);
+      setUsernameCheckError("");
+      return;
+    }
+
+    const err = validateUsername(trimmed);
+    if (err) {
+      setUsernameAvailable(false);
+      setUsernameCheckError("");
+      return;
+    }
+
+    setCheckingUsername(true);
+    setUsernameAvailable(null);
+    setUsernameCheckError("");
+
+    const timeoutId = setTimeout(async () => {
+      const { available, message } = await checkUsernameAvailable(trimmed);
+      setUsernameAvailable(available);
+      setUsernameCheckError(available ? "" : message);
+      setCheckingUsername(false);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [username]);
 
   const strength = getPasswordStrength(password);
   const passwordsMatch = confirm.length > 0 && password === confirm;
 
-  // Compute live errors only for touched fields
-  const emailError = touched.email ? validateEmail(email) : "";
+  const nameError = touched.name ? validateName(name) : "";
+  const usernameError = touched.username ? (validateUsername(username) || usernameCheckError) : "";
   const passwordError = touched.password ? validatePassword(password) : "";
   const confirmError = touched.confirm ? validateConfirm(confirm, password) : "";
 
@@ -132,31 +166,33 @@ export default function SignupPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setTouched({ email: true, password: true, confirm: true });
+    setTouched({ name: true, username: true, password: true, confirm: true });
 
-    const eErr = validateEmail(email);
+    const nErr = validateName(name);
+    const uErr = validateUsername(username);
     const pErr = validatePassword(password);
     const cErr = validateConfirm(confirm, password);
 
-    if (eErr || pErr || cErr) return;
+    if (nErr || uErr || pErr || cErr || usernameAvailable === false) return;
 
     registerMutate(
-      { email: email.trim(), password },
+      { name: name.trim(), username: username.trim(), password },
       {
-        onSuccess: () => {
-          setSubmitted(true);
-          setEmail("");
-          setPassword("");
-          setConfirm("");
-          setTouched({});
+        onSuccess: (user) => {
+          if (!user?.username) {
+            router.replace("/profile");
+          } else {
+            router.replace("/dashboard");
+          }
         },
       }
     );
   }
 
   function getFieldStyle(field: Fields, extraMatch?: boolean) {
-    let error: string = "";
-    if (field === "email") error = emailError;
+    let error = "";
+    if (field === "name") error = nameError;
+    else if (field === "username") error = usernameError;
     else if (field === "password") error = passwordError;
     else if (field === "confirm") error = confirmError;
 
@@ -169,10 +205,7 @@ export default function SignupPage() {
       };
     }
     if (extraMatch) {
-      return {
-        border: "1px solid rgba(163,190,140,0.4)",
-        boxShadow: "none",
-      };
+      return { border: "1px solid rgba(163,190,140,0.4)", boxShadow: "none" };
     }
     return {
       border: isFocused ? "1px solid rgba(163,190,140,0.5)" : "1px solid rgba(255,255,255,0.08)",
@@ -184,53 +217,14 @@ export default function SignupPage() {
     <main className="relative min-h-screen w-full bg-[#0d1117] flex items-center justify-center overflow-hidden py-10">
 
       {/* Ambient glow blobs */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "-5%",
-            right: "10%",
-            width: "520px",
-            height: "520px",
-            background:
-              "radial-gradient(ellipse at center, rgba(163,190,140,0.08) 0%, transparent 70%)",
-            filter: "blur(40px)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "5%",
-            left: "8%",
-            width: "400px",
-            height: "400px",
-            background:
-              "radial-gradient(ellipse at center, rgba(143,188,187,0.06) 0%, transparent 70%)",
-            filter: "blur(50px)",
-          }}
-        />
-        {/* Subtle grid */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div style={{ position: "absolute", top: "-5%", right: "10%", width: "520px", height: "520px", background: "radial-gradient(ellipse at center, rgba(163,190,140,0.08) 0%, transparent 70%)", filter: "blur(40px)" }} />
+        <div style={{ position: "absolute", bottom: "5%", left: "8%", width: "400px", height: "400px", background: "radial-gradient(ellipse at center, rgba(143,188,187,0.06) 0%, transparent 70%)", filter: "blur(50px)" }} />
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
       </div>
 
       {/* Back to home */}
-      <Link
-        href="/"
-        className="absolute top-6 left-6 z-20 flex items-center gap-2 text-[#6b7a8d] hover:text-[#d8dee9] text-sm transition-colors duration-150 focus-visible:outline-none"
-        id="back-to-home"
-        aria-label="Back to home"
-      >
+      <Link href="/" className="absolute top-6 left-6 z-20 flex items-center gap-2 text-[#6b7a8d] hover:text-[#d8dee9] text-sm transition-colors duration-150 focus-visible:outline-none" id="back-to-home" aria-label="Back to home">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5M12 5l-7 7 7 7" />
         </svg>
@@ -238,31 +232,17 @@ export default function SignupPage() {
       </Link>
 
       {/* Card */}
-      <div
-        className="auth-card relative z-10 w-full max-w-md mx-4"
-        style={{
-          background: "rgba(22,27,34,0.75)",
-          backdropFilter: "blur(24px) saturate(1.5)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.5)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "24px",
-          padding: "40px 36px 36px",
-          boxShadow:
-            "0 0 0 1px rgba(163,190,140,0.04), 0 32px 64px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
-        }}
-      >
+      <div className="auth-card relative z-10 w-full max-w-md mx-4" style={{ background: "rgba(22,27,34,0.75)", backdropFilter: "blur(24px) saturate(1.5)", WebkitBackdropFilter: "blur(24px) saturate(1.5)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "24px", padding: "40px 36px 36px", boxShadow: "0 0 0 1px rgba(163,190,140,0.04), 0 32px 64px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)" }}>
+
         {/* Logo */}
         <div className="flex flex-col items-center gap-1 mb-8">
           <Link href="/" className="focus-visible:outline-none" tabIndex={-1} aria-hidden="true">
-            <span className={`${glitchFont.className} text-3xl text-[#eceff4] tracking-wide`}>
-              Echo
-            </span>
+            <span className={`${glitchFont.className} text-3xl text-[#eceff4] tracking-wide`}>Echo</span>
           </Link>
         </div>
 
-        <h1 className="text-[#eceff4] text-2xl font-bold text-center mb-1 tracking-tight">
-          Create your account
-        </h1>
+        <h1 className="text-[#eceff4] text-2xl font-bold text-center mb-1 tracking-tight">Create your account</h1>
+        <p className="text-[#6b7a8d] text-sm text-center mb-7">Join Echo and start listening together</p>
 
         <GoogleOAuthButton />
 
@@ -274,85 +254,85 @@ export default function SignupPage() {
         </div>
 
         {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4"
-          noValidate
-        >
-          {/* Email */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+
+          {/* Name */}
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="signup-email"
-              className="text-[#d8dee9] text-xs font-medium tracking-wide"
-            >
-              Email
-            </label>
-            <div
-              className="relative rounded-xl transition-all duration-200"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                ...getFieldStyle("email"),
-              }}
-            >
+            <label htmlFor="signup-name" className="text-[#d8dee9] text-xs font-medium tracking-wide">Display Name</label>
+            <div className="relative rounded-xl transition-all duration-200" style={{ background: "rgba(255,255,255,0.04)", ...getFieldStyle("name") }}>
               <input
-                id="signup-email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={e => {
-                  setEmail(e.target.value);
-                  if (touched.email) {
-                    // live re-validate
-                  }
-                }}
-                onFocus={() => setFocused("email")}
-                onBlur={() => handleBlur("email")}
-                aria-invalid={!!emailError}
-                aria-describedby={emailError ? "signup-email-error" : undefined}
+                id="signup-name"
+                type="text"
+                autoComplete="name"
+                placeholder="Your full name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onFocus={() => setFocused("name")}
+                onBlur={() => handleBlur("name")}
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? "signup-name-error" : undefined}
                 className="w-full bg-transparent px-4 py-3 text-[#eceff4] text-sm placeholder-[#6b7a8d]/60 focus:outline-none rounded-xl"
               />
             </div>
-            {emailError && <FieldError id="signup-email-error" message={emailError} />}
+            {nameError && <FieldError id="signup-name-error" message={nameError} />}
+          </div>
+
+          {/* Username */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="signup-username" className="text-[#d8dee9] text-xs font-medium tracking-wide">Username</label>
+            <div className="relative rounded-xl transition-all duration-200 flex items-center" style={{ background: "rgba(255,255,255,0.04)", ...getFieldStyle("username") }}>
+              <span className="pl-4 pr-1 text-[#6b7a8d] text-sm select-none" aria-hidden="true">@</span>
+              <input
+                id="signup-username"
+                type="text"
+                autoComplete="username"
+                placeholder="yourhandle"
+                value={username}
+                onChange={e => setUsername(e.target.value.replace(/\s/g, ""))}
+                onFocus={() => setFocused("username")}
+                onBlur={() => handleBlur("username")}
+                aria-invalid={!!usernameError}
+                aria-describedby={usernameError ? "signup-username-error" : undefined}
+                className="flex-1 bg-transparent pr-10 py-3 text-[#eceff4] text-sm placeholder-[#6b7a8d]/60 focus:outline-none"
+              />
+              {username.length >= 3 && (
+                <div className="absolute right-4 flex items-center">
+                  {checkingUsername ? (
+                    <svg className="animate-spin text-[#6b7a8d]" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" />
+                      <path d="M12 2A10 10 0 0 1 22 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                  ) : usernameAvailable ? (
+                    <span className="text-[#a3be8c]"><CheckIcon /></span>
+                  ) : usernameAvailable === false && !validateUsername(username) ? (
+                    <span className="text-[#bf616a]"><ErrorIcon /></span>
+                  ) : null}
+                </div>
+              )}
+            </div>
+            {usernameError && <FieldError id="signup-username-error" message={usernameError} />}
           </div>
 
           {/* Password */}
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="signup-password"
-              className="text-[#d8dee9] text-xs font-medium tracking-wide"
-            >
-              Password
-            </label>
-            <div
-              className="relative rounded-xl transition-all duration-200"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                ...getFieldStyle("password"),
-              }}
-            >
+            <label htmlFor="signup-password" className="text-[#d8dee9] text-xs font-medium tracking-wide">Password</label>
+            <div className="relative rounded-xl transition-all duration-200" style={{ background: "rgba(255,255,255,0.04)", ...getFieldStyle("password") }}>
               <input
                 id="signup-password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 placeholder="••••••••"
                 value={password}
-                onChange={e => {
-                  setPassword(e.target.value);
-                }}
+                onChange={e => setPassword(e.target.value)}
                 onFocus={() => setFocused("password")}
                 onBlur={() => handleBlur("password")}
                 aria-invalid={!!passwordError}
                 aria-describedby={passwordError ? "signup-password-error" : undefined}
                 className="w-full bg-transparent px-4 py-3 pr-12 text-[#eceff4] text-sm placeholder-[#6b7a8d]/60 focus:outline-none rounded-xl"
               />
-              <button
-                type="button"
-                id="toggle-password-visibility"
-                onClick={() => setShowPassword(v => !v)}
+              <button type="button" id="toggle-password-visibility" onClick={() => setShowPassword(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6b7a8d] hover:text-[#d8dee9] transition-colors duration-150 cursor-pointer focus-visible:outline-none"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
+                aria-label={showPassword ? "Hide password" : "Show password"}>
                 <EyeIcon open={showPassword} />
               </button>
             </div>
@@ -362,71 +342,41 @@ export default function SignupPage() {
               <div className="flex items-center gap-2 mt-0.5">
                 <div className="flex gap-1 flex-1">
                   {[0, 1, 2].map(i => (
-                    <div
-                      key={i}
-                      className="h-1 flex-1 rounded-full transition-all duration-300"
-                      style={{
-                        background:
-                          i < strengthConfig[strength].bars
-                            ? strengthConfig[strength].color
-                            : "rgba(255,255,255,0.08)",
-                      }}
+                    <div key={i} className="h-1 flex-1 rounded-full transition-all duration-300"
+                      style={{ background: i < strengthConfig[strength].bars ? strengthConfig[strength].color : "rgba(255,255,255,0.08)" }}
                     />
                   ))}
                 </div>
-                <span
-                  className="text-xs font-medium transition-colors duration-200"
-                  style={{ color: strengthConfig[strength].color }}
-                >
+                <span className="text-xs font-medium transition-colors duration-200" style={{ color: strengthConfig[strength].color }}>
                   {strengthConfig[strength].label}
                 </span>
               </div>
             )}
-
             {passwordError && <FieldError id="signup-password-error" message={passwordError} />}
           </div>
 
           {/* Confirm Password */}
           <div className="flex flex-col gap-1.5">
-            <label
-              htmlFor="signup-confirm-password"
-              className="text-[#d8dee9] text-xs font-medium tracking-wide"
-            >
-              Confirm Password
-            </label>
-            <div
-              className="relative rounded-xl transition-all duration-200"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                ...getFieldStyle("confirm", passwordsMatch),
-              }}
-            >
+            <label htmlFor="signup-confirm-password" className="text-[#d8dee9] text-xs font-medium tracking-wide">Confirm Password</label>
+            <div className="relative rounded-xl transition-all duration-200" style={{ background: "rgba(255,255,255,0.04)", ...getFieldStyle("confirm", passwordsMatch) }}>
               <input
                 id="signup-confirm-password"
                 type={showConfirm ? "text" : "password"}
                 autoComplete="new-password"
                 placeholder="••••••••"
                 value={confirm}
-                onChange={e => {
-                  setConfirm(e.target.value);
-                }}
+                onChange={e => setConfirm(e.target.value)}
                 onFocus={() => setFocused("confirm")}
                 onBlur={() => handleBlur("confirm")}
                 aria-invalid={!!confirmError}
                 aria-describedby={confirmError ? "signup-confirm-error" : undefined}
                 className="w-full bg-transparent px-4 py-3 pr-12 text-[#eceff4] text-sm placeholder-[#6b7a8d]/60 focus:outline-none rounded-xl"
               />
-              <button
-                type="button"
-                id="toggle-confirm-visibility"
-                onClick={() => setShowConfirm(v => !v)}
+              <button type="button" id="toggle-confirm-visibility" onClick={() => setShowConfirm(v => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6b7a8d] hover:text-[#d8dee9] transition-colors duration-150 cursor-pointer focus-visible:outline-none"
-                aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
-              >
+                aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}>
                 {passwordsMatch ? (
-                  <span className="text-[#a3be8c]">
-                    <CheckIcon />
-                  </span>
+                  <span className="text-[#a3be8c]"><CheckIcon /></span>
                 ) : (
                   <EyeIcon open={showConfirm} />
                 )}
@@ -435,33 +385,17 @@ export default function SignupPage() {
             {confirmError && <FieldError id="signup-confirm-error" message={confirmError} />}
           </div>
 
-
-
           {/* Submit */}
           <button
             id="signup-submit"
             type="submit"
-            disabled={isPending || submitted}
+            disabled={isPending}
             className="w-full py-3 rounded-xl text-[#0f1117] text-sm font-semibold transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#a3be8c]/60 mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{
-              background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
-            }}
-            onMouseEnter={e => {
-              if (isPending || submitted) return;
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(163,190,140,0.25)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
-            }}
-            onMouseDown={e => {
-              if (isPending || submitted) return;
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.975)";
-            }}
-            onMouseUp={e => {
-              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)";
-            }}
+            style={{ background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)" }}
+            onMouseEnter={e => { if (isPending) return; (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(163,190,140,0.25)"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; (e.currentTarget as HTMLButtonElement).style.boxShadow = "none"; }}
+            onMouseDown={e => { if (isPending) return; (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.975)"; }}
+            onMouseUp={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.015)"; }}
           >
             {isPending ? (
               <span className="flex items-center justify-center gap-2">
@@ -478,11 +412,7 @@ export default function SignupPage() {
         {/* Login link */}
         <p className="text-center text-[#6b7a8d] text-sm mt-6">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            id="goto-login"
-            className="text-[#a3be8c] hover:text-[#8faa78] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:underline"
-          >
+          <Link href="/login" id="goto-login" className="text-[#a3be8c] hover:text-[#8faa78] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:underline">
             Sign in
           </Link>
         </p>

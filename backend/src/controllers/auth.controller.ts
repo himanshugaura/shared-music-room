@@ -1,16 +1,12 @@
-import type { CookieOptions,Request, Response } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
 import {
   googleAuthUser,
   loginUser,
   logoutUser,
   refreshTokens,
   registerUser,
-  sendVerificationEmailByEmail,
-  sendVerificationEmailToUser,
-  verifyEmailToken,
 } from '../services/auth.service.js';
-import type { GoogleAuthBody,LoginBody, RegisterBody } from '../types/auth.types.js';
-import { ApiError } from '../utils/apiError.js';
+import type { GoogleAuthBody, LoginBody, RegisterBody } from '../types/auth.types.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { verifyRefreshToken } from '../utils/jwt.js';
@@ -46,17 +42,19 @@ const setAuthCookies = (res: Response, accessToken: string, refreshToken: string
 };
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body as RegisterBody;
+  const { username, name, password } = req.body as RegisterBody;
 
-  const user = await registerUser(email, password);
+  const { accessToken, refreshToken, user } = await registerUser(username, name, password);
+
+  setAuthCookies(res, accessToken, refreshToken);
 
   return new ApiResponse(201, user, 'User registered successfully').send(res);
 });
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body as LoginBody;
+  const { username, password } = req.body as LoginBody;
 
-  const { accessToken, refreshToken, user } = await loginUser(email, password);
+  const { accessToken, refreshToken, user } = await loginUser(username, password);
 
   setAuthCookies(res, accessToken, refreshToken);
 
@@ -81,7 +79,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
       const { sessionId } = verifyRefreshToken(refreshToken);
       await logoutUser(sessionId);
     } catch {
-    
+      // ignore errors — still clear cookies
     }
   }
 
@@ -106,27 +104,6 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
       .clearCookie('accessToken', CLEAR_COOKIE_OPTIONS)
       .clearCookie('refreshToken', CLEAR_COOKIE_OPTIONS);
 
-    throw error; 
+    throw error;
   }
-});
-
-export const sendVerificationEmail = asyncHandler(async (req: Request, res: Response) => {
-  if (req.user?.id) {
-    await sendVerificationEmailToUser(req.user.id);
-  } else {
-    const { email } = req.body as { email: string };
-    await sendVerificationEmailByEmail(email);
-  }
-
-  return new ApiResponse(200, null, 'Verification email sent').send(res);
-});
-
-export const verifyEmail = asyncHandler(async (req: Request, res: Response) => {
-  const { token } = req.query as { token?: string };
-
-  if (!token) {throw new ApiError(400, 'Verification token is required');}
-
-  await verifyEmailToken(token);
-
-  return new ApiResponse(200, null, 'Email verified successfully').send(res);
 });

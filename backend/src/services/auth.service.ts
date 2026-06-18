@@ -1,32 +1,27 @@
 import argon from 'argon2';
 import { OAuth2Client } from 'google-auth-library';
+import { nanoid } from 'nanoid';
 
 import {
   createRefreshSession,
-   createUser,
-  deleteExpiredRefreshSessions,
+  createUser,
   deleteRefreshSessionById,
+  findRefreshSessionById,
   findUserByEmail,
   findUserById,
+  findUserByUsername,
   updateRefreshSessionToken,
-  updateUserById,
-  findRefreshSessionById,
 } from '../repositories/auth.repository.js';
 import type {
   AuthTokenResponse,
   AuthUser,
-  RegisterResponse,
 } from '../types/auth.types.js';
 import { ApiError } from '../utils/apiError.js';
 import {
   generateAccessToken,
-  generateEmailVerificationToken,
   generateRefreshToken,
-  verifyEmailVerificationToken,
   verifyRefreshToken,
 } from '../utils/jwt.js';
-import { verificationEmailSender } from '../utils/sendMail.js';
-import { nanoid } from 'nanoid';
 
 const googleClient = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -37,24 +32,17 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const toAuthUser = (user: {
   id: string;
-  email: string;
+  username: string | null;
   name: string | null;
-  isVerified: boolean;
+  email: string | null;
   avatarUrl: string | null;
-}): AuthUser => {
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    isVerified: user.isVerified,
-    avatarUrl: user.avatarUrl,
-  };
-};
-
-const buildVerificationUrl = (userId: string): string => {
-  const token = generateEmailVerificationToken({ userId });
-  return `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
-};
+}): AuthUser => ({
+  id: user.id,
+  username: user.username,
+  name: user.name,
+  email: user.email,
+  avatarUrl: user.avatarUrl,
+});
 
 const createSessionAndTokens = async (
   userId: string,
@@ -76,58 +64,55 @@ const createSessionAndTokens = async (
   return { accessToken, refreshToken };
 };
 
-export const registerUser = async (email: string, password: string): Promise<RegisterResponse> => {
-  const existing = await findUserByEmail(email);
+export const registerUser = async (
+  username: string,
+  name: string,
+  password: string,
+): Promise<AuthTokenResponse> => {
+  const existing = await findUserByUsername(username);
 
   if (existing) {
-    const message =
-      existing.provider === 'google'
-        ? 'Account already exists. Continue with Google.'
-        : 'Account already exists.';
-    throw new ApiError(409, message);
+    throw new ApiError(409, 'Username is already taken');
   }
 
   const hashedPassword = await argon.hash(password);
-  const user = await createUser({ email, password: hashedPassword });
-
-  const verificationUrl = buildVerificationUrl(user.id);
-  await verificationEmailSender({ to: user.email, url: verificationUrl });
-
-  return { id: user.id, email: user.email };
-};
-
-export const loginUser = async (email: string, password: string): Promise<AuthTokenResponse> => {
-  const user = await findUserByEmail(email);
-
-  if (!user) {throw new ApiError(401, 'Invalid credentials');}
-  if (user.provider === 'google') {throw new ApiError(401, 'This account uses Google sign-in');}
-  if (!user.password) {throw new ApiError(401, 'Invalid credentials');}
-
-  const isValid = await argon.verify(user.password, password);
-  if (!isValid) {throw new ApiError(401, 'Invalid credentials');}
+  const user = await createUser({ username, name, password: hashedPassword });
 
   const { accessToken, refreshToken } = await createSessionAndTokens(user.id);
 
-  return {
-    accessToken,
-    refreshToken,
-    user: toAuthUser(user),
-  };
+  return { accessToken, refreshToken, user: toAuthUser(user) };
+};
+
+export const loginUser = async (
+  username: string,
+  password: string,
+): Promise<AuthTokenResponse> => {
+  const user = await findUserByUsername(username);
+
+  if (!user) { throw new ApiError(401, 'Invalid credentials'); }
+  if (user.provider === 'google') { throw new ApiError(401, 'This account uses Google sign-in'); }
+  if (!user.password) { throw new ApiError(401, 'Invalid credentials'); }
+
+  const isValid = await argon.verify(user.password, password);
+  if (!isValid) { throw new ApiError(401, 'Invalid credentials'); }
+
+  const { accessToken, refreshToken } = await createSessionAndTokens(user.id);
+
+  return { accessToken, refreshToken, user: toAuthUser(user) };
 };
 
 export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> => {
   if (!code) {
-    throw new ApiError(400, "Authorization code is required");
+    throw new ApiError(400, 'Authorization code is required');
   }
 
   const { tokens } = await googleClient.getToken({
-  code,
-  redirect_uri: "postmessage",
-});
-
+    code,
+    redirect_uri: 'postmessage',
+  });
 
   if (!tokens.id_token) {
-    throw new ApiError(401, "Google did not return an ID token");
+    throw new ApiError(401, 'Google did not return an ID token');
   }
 
   const ticket = await googleClient.verifyIdToken({
@@ -138,13 +123,13 @@ export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> =
   const payload = ticket.getPayload();
 
   if (!payload?.email || !payload.sub) {
-    throw new ApiError(401, "Invalid Google token");
+    throw new ApiError(401, 'Invalid Google token');
   }
 
   let user = await findUserByEmail(payload.email);
 
   if (user && user.provider !== 'google') {
-    throw new ApiError(409, 'Account already exists with email/password');
+    throw new ApiError(409, 'Account already exists with username/password');
   }
 
   if (!user) {
@@ -154,32 +139,27 @@ export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> =
       googleId: payload.sub,
       avatarUrl: payload.picture ?? null,
       provider: 'google',
-      isVerified: true,
     });
   }
 
   const { accessToken, refreshToken } = await createSessionAndTokens(user.id);
 
-  return {
-    accessToken,
-    refreshToken,
-    user: toAuthUser(user),
-  };
+  return { accessToken, refreshToken, user: toAuthUser(user) };
 };
 
-export const logoutUser = async ( sessionId: string): Promise<void> => {
-  await deleteRefreshSessionById( sessionId);
+export const logoutUser = async (sessionId: string): Promise<void> => {
+  await deleteRefreshSessionById(sessionId);
 };
 
 export const refreshTokens = async (
   incomingRefreshToken: string,
 ): Promise<{ newAccessToken: string; newRefreshToken: string }> => {
-  if (!incomingRefreshToken) {throw new ApiError(401, 'Unauthorized');}
+  if (!incomingRefreshToken) { throw new ApiError(401, 'Unauthorized'); }
 
   const tokenPayload = verifyRefreshToken(incomingRefreshToken);
   const session = await findRefreshSessionById(tokenPayload.sessionId);
 
-  if (!session) {throw new ApiError(401, 'Unauthorized');}
+  if (!session) { throw new ApiError(401, 'Unauthorized'); }
 
   if (session.expiresAt.getTime() <= Date.now()) {
     await deleteRefreshSessionById(tokenPayload.sessionId);
@@ -197,51 +177,9 @@ export const refreshTokens = async (
     sessionId: session.id,
   });
   const hashedNewRefreshToken = await argon.hash(newRefreshToken);
-
   const newAccessToken = generateAccessToken({ userId: tokenPayload.userId });
 
   await updateRefreshSessionToken(session.id, hashedNewRefreshToken);
 
-  return {
-    newAccessToken,
-    newRefreshToken,
-  };
-};
-
-export const sendVerificationEmailToUser = async (userId: string): Promise<void> => {
-  const user = await findUserById(userId);
-
-  if (!user) {throw new ApiError(404, 'User not found');}
-  if (user.isVerified) {throw new ApiError(400, 'Email is already verified');}
-
-  await verificationEmailSender({
-    to: user.email,
-    url: buildVerificationUrl(user.id),
-  });
-};
-
-export const sendVerificationEmailByEmail = async (email: string): Promise<void> => {
-  const user = await findUserByEmail(email);
-
-  if (!user) {throw new ApiError(404, 'User not found');}
-  if (user.isVerified) {throw new ApiError(400, 'Email is already verified');}
-
-  await verificationEmailSender({
-    to: user.email,
-    url: buildVerificationUrl(user.id),
-  });
-};
-
-export const verifyEmailToken = async (token: string): Promise<void> => {
-  const tokenPayload = verifyEmailVerificationToken(token);
-  const user = await findUserById(tokenPayload.userId);
-
-  if (!user) {throw new ApiError(404, 'User not found');}
-  if (user.isVerified) {throw new ApiError(400, 'Email is already verified');}
-
-  await updateUserById(user.id, { isVerified: true });
-};
-
-export const cleanupExpiredSessions = async (): Promise<number> => {
-  return deleteExpiredRefreshSessions();
+  return { newAccessToken, newRefreshToken };
 };

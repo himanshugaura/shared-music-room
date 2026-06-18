@@ -6,13 +6,10 @@
 /** Routes only guests can visit — logged-in users get bounced to /dashboard. */
 export const GUEST_ONLY_ROUTES = ["/login", "/signup"] as const;
 
-/** Routes only for logged-in but UNVERIFIED users. */
-export const VERIFY_ONLY_ROUTES = ["/verify-email"] as const;
-
-/** Routes only for logged-in VERIFIED users who have incomplete profiles (no name/username). */
+/** Routes only for logged-in users who have incomplete profiles (no name/username). */
 export const PROFILE_SETUP_ROUTES = ["/profile"] as const;
 
-/** Routes that require the user to be logged-in, verified, AND have a complete profile. */
+/** Routes that require the user to be logged-in AND have a complete profile. */
 export const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/room"] as const;
 
 /**
@@ -20,7 +17,6 @@ export const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/room"] as const;
  */
 export const NO_REDIRECT_ON_AUTH_FAIL = [
   ...GUEST_ONLY_ROUTES,
-  ...VERIFY_ONLY_ROUTES,
   ...PROFILE_SETUP_ROUTES,
   "/",
 ] as const;
@@ -29,10 +25,6 @@ export const NO_REDIRECT_ON_AUTH_FAIL = [
 
 export function isGuestOnly(path: string) {
   return GUEST_ONLY_ROUTES.some((r) => path === r || path.startsWith(r + "/"));
-}
-
-export function isVerifyOnly(path: string) {
-  return VERIFY_ONLY_ROUTES.some((r) => path === r || path.startsWith(r + "/"));
 }
 
 export function isProfileSetup(path: string) {

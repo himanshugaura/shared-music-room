@@ -49,8 +49,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
   // Ref exposing imperative player controls (set by PlayerPanel)
   const controlRef = useRef<PlayerControls | null>(null);
 
-  // Rough online member count (real-time from socket events)
-  const [onlineCount, setOnlineCount] = useState(1);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   // ── Initial sync: load current song at correct position once queue arrives ──
@@ -202,7 +200,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
         room={room}
         queue={queue}
         isOwner={isOwner}
-        onlineCount={onlineCount}
       />
 
       {/* Main content: player left, queue right */}

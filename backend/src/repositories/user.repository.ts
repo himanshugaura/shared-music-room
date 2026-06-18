@@ -10,7 +10,6 @@ const USER_PROFILE_SELECT = {
   email: true,
   username: true,
   avatarUrl: true,
-  isVerified: true,
   createdAt: true,
 } as const satisfies Prisma.UserSelect;
 
@@ -24,7 +23,7 @@ const ROOM_SUMMARY_SELECT = {
 
 export const findUserProfileById = async (
   id: string,
-): Promise<(AuthUser & { username: string | null; createdAt: Date; isVerified: boolean }) | null> => {
+): Promise<(AuthUser & { username: string | null; createdAt: Date }) | null> => {
   return prisma.user.findUnique({
     where: { id },
     select: USER_PROFILE_SELECT,
@@ -63,14 +62,10 @@ export const updateUserProfile = async (
   return prisma.user.update({ where: { id }, data });
 };
 
-
 export const joinRoomAsMember = async (roomId: string, userId: string): Promise<void> => {
   await prisma.roomMember.create({
-      data: {
-        roomId,
-        userId,
-      },
-    });
+    data: { roomId, userId },
+  });
 };
 
 export const findRoomMember = async (

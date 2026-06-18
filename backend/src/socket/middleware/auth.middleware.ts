@@ -40,8 +40,7 @@ export const socketAuthMiddleware = async (
 
     (socket as AuthenticatedSocket).user = {
       id: user.id,
-      email: user.email,
-      isVerified: user.isVerified,
+      email: user.email ?? null,
     };
 
     next();

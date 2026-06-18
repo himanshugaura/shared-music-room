@@ -22,7 +22,7 @@ function AvatarBadge({
   avatarUrl: string | null;
   name: string | null;
   username: string | null;
-  email: string;
+  email?: string | null;
   size?: number;
 }) {
   const initials = (name || username || email || "?")
@@ -154,7 +154,7 @@ export default function Navbar() {
                       avatarUrl={user.avatarUrl}
                       name={user.name}
                       username={user.username}
-                      email={user.email}
+                      email={user.email ?? undefined}
                     />
                     {/* Chevron */}
                     <svg
@@ -208,7 +208,7 @@ export default function Navbar() {
                           {user.name || user.username || "User"}
                         </p>
                         <p style={{ margin: "2px 0 0", fontSize: "11px", color: "#6b7a8d", wordBreak: "break-all" }}>
-                          {user.email}
+                          {user.email ?? user.username ?? ""}
                         </p>
                       </div>
 

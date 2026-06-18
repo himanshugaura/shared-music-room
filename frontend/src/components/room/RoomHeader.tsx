@@ -9,10 +9,9 @@ interface Props {
   room: Room;
   queue: QueueState | undefined;
   isOwner: boolean;
-  onlineCount: number;
 }
 
-export function RoomHeader({ room, queue, isOwner, onlineCount }: Props) {
+export function RoomHeader({ room, queue, isOwner }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
 
   function copyCode() {
@@ -71,12 +70,6 @@ export function RoomHeader({ room, queue, isOwner, onlineCount }: Props) {
             {room.description}
           </p>
         )}
-      </div>
-
-      {/* Online count */}
-      <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6b7a8d", flexShrink: 0 }}>
-        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a3be8c", display: "inline-block", boxShadow: "0 0 6px rgba(163,190,140,0.6)" }} />
-        {onlineCount} online
       </div>
 
       {/* Room code */}

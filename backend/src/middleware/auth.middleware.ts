@@ -35,8 +35,7 @@ export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, nex
 
   req.user = {
     id: user.id,
-    email: user.email,
-    isVerified: user.isVerified,
+    email: user.email ?? null,
   };
 
   next();

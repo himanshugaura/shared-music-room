@@ -4,7 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useMe } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store";
-import { isGuestOnly, isVerifyOnly, isProfileSetup, isProtected } from "@/lib/routes";
+import { isGuestOnly, isProfileSetup, isProtected } from "@/lib/routes";
 
 // ─── Loading spinner ──────────────────────────────────────────────────────────
 
@@ -67,44 +67,24 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (!isHydrated) return;
 
     const loggedIn = !!user;
-    const verified = loggedIn && user!.isVerified;
     const profileComplete = loggedIn && !!user!.username;
 
     // ── Guest-only routes (login / signup) ──────────────────────────────────
     if (isGuestOnly(pathname)) {
-      if (loggedIn && verified && profileComplete) {
+      if (loggedIn && profileComplete) {
         router.replace("/dashboard");
-      } else if (loggedIn && verified && !profileComplete) {
-        router.replace("/profile");
-      } else if (loggedIn && !verified) {
-        // Unverified users shouldn't be on login/signup either
-        router.replace("/verify-email");
-      }
-      return;
-    }
-
-    // ── Verify-mail route ───────────────────────────────────────────────────
-    if (isVerifyOnly(pathname)) {
-      if (!loggedIn) {
-        router.replace("/login");
-      } else if (verified && profileComplete) {
-        router.replace("/dashboard");
-      } else if (verified && !profileComplete) {
+      } else if (loggedIn && !profileComplete) {
         router.replace("/profile");
       }
       return;
     }
 
     // ── Profile route (/profile) ─────────────────────────────────────────────
-    // Requires login + verification only. Users can visit whether their
-    // profile is complete or not (new setup OR editing existing profile).
+    // Requires login only. Users can visit whether their profile is complete or not.
     if (isProfileSetup(pathname)) {
       if (!loggedIn) {
         router.replace("/login");
-      } else if (!verified) {
-        router.replace("/verify-email");
       }
-      // Always allowed to stay — profile page handles both setup and editing
       return;
     }
 
@@ -112,8 +92,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (isProtected(pathname)) {
       if (!loggedIn) {
         router.replace("/login");
-      } else if (!verified) {
-        router.replace("/verify-email");
       } else if (!profileComplete) {
         router.replace("/profile");
       }

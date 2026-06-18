@@ -2,8 +2,7 @@ import type { Socket } from 'socket.io';
 
 export type SocketUser = {
   id: string;
-  email: string;
-  isVerified: boolean;
+  email: string | null;
 };
 
 export type AuthenticatedSocket = Socket & {

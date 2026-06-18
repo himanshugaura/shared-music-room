@@ -1,8 +1,8 @@
 export interface AuthUser {
   id: string;
-  email: string;
+  username: string | null;
   name: string | null;
-  isVerified: boolean;
+  email: string | null;
   avatarUrl: string | null;
 }
 
@@ -13,8 +13,9 @@ export interface AuthTokenResponse {
 }
 
 export interface RegisterResponse {
-  id: string;
-  email: string;
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser;
 }
 
 export interface AccessTokenPayload {
@@ -23,24 +24,20 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   userId: string;
+  sessionId: string;
 }
 
 export interface RegisterBody {
-  email: string;
+  username: string;
+  name: string;
   password: string;
 }
 
 export interface LoginBody {
-  email: string;
+  username: string;
   password: string;
 }
 
 export interface GoogleAuthBody {
   code: string;
-}
-
-export interface AuthPayload {
-  id: string;
-  email: string;
-  isVerified: boolean;
 }

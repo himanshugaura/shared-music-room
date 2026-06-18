@@ -66,15 +66,14 @@ function SectionHeader({ title, description }: { title: string; description?: st
 }
 
 function AvatarEditor({
-  avatarUrl, name, email, preview, onClick,
+  avatarUrl, name, preview, onClick,
 }: {
   avatarUrl: string | null;
   name: string | null;
-  email: string;
   preview: string | null;
   onClick: () => void;
 }) {
-  const initials = (name || email || "?")
+  const initials = (name || "?")
     .trim().split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   const src = preview || avatarUrl;
   const [hovered, setHovered] = useState(false);
@@ -480,7 +479,7 @@ export default function ProfilePage() {
                 <img src={avatarPreview || user?.avatarUrl || ""} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <span style={{ fontSize: "18px", fontWeight: 700, color: "#a3be8c", userSelect: "none" }}>
-                  {(user?.name || user?.email || "?").trim().split(/\s+/).map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                  {(user?.name || user?.username || "?").trim().split(/\s+/).map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
                 </span>
               )}
             </div>
@@ -489,7 +488,7 @@ export default function ProfilePage() {
               <p style={{ margin: "0 0 2px", fontSize: "13px", fontWeight: 600, color: "#eceff4" }}>
                 {user?.name || user?.username || "New user"}
               </p>
-              <p style={{ margin: 0, fontSize: "11px", color: "#6b7a8d" }}>{user?.email}</p>
+              <p style={{ margin: 0, fontSize: "11px", color: "#6b7a8d" }}>{user?.username ? `@${user.username}` : "No username set"}</p>
             </div>
 
             {!profileComplete && (
@@ -547,7 +546,6 @@ export default function ProfilePage() {
                 <AvatarEditor
                   avatarUrl={user?.avatarUrl ?? null}
                   name={user?.name ?? null}
-                  email={user?.email ?? ""}
                   preview={avatarPreview}
                   onClick={() => fileInputRef.current?.click()}
                 />
@@ -555,7 +553,7 @@ export default function ProfilePage() {
                   <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#d8dee9", fontWeight: 500 }}>
                     {user?.name || user?.username || "Your name"}
                   </p>
-                  <p style={{ margin: "0 0 12px", fontSize: "12px", color: "#6b7a8d" }}>{user?.email}</p>
+                  <p style={{ margin: "0 0 12px", fontSize: "12px", color: "#6b7a8d" }}>{user?.username ? `@${user.username}` : ""}</p>
                   <button
                     type="button"
                     id="upload-photo-btn"
@@ -606,12 +604,7 @@ export default function ProfilePage() {
                     currentUsername={user?.username}
                   />
                 </div>
-                <InputField
-                  id="profile-email"
-                  label="Email address"
-                  value={user?.email ?? ""}
-                  disabled
-                />
+
               </div>
 
 

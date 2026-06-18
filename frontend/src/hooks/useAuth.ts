@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store";
-import { login, logout, getMe, googleAuth, register, verifyEmail } from "@/services/auth.service";
+import { login, logout, getMe, googleAuth, register } from "@/services/auth.service";
 import { api } from "@/api/axios";
 import { toast } from "sonner";
 
@@ -29,7 +29,6 @@ export const useMe = () => {
     staleTime: Infinity,
   });
 
-  // Fire setHydrated once the query settles — regardless of success or failure
   useEffect(() => {
     if (query.isSuccess || query.isError) {
       setHydrated();
@@ -44,8 +43,8 @@ export const useLogin = () => {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      login({ email, password }),
+    mutationFn: ({ username, password }: { username: string; password: string }) =>
+      login({ username, password }),
     onSuccess: (user) => {
       setUser(user);
       qc.setQueryData(PROFILE_KEY, user);
@@ -56,17 +55,23 @@ export const useLogin = () => {
   });
 };
 
-export const useRegister = () =>
-  useMutation({
-    mutationFn: ({ email, password }: { email: string; password: string }) =>
-      register({ email, password }),
-    onSuccess: () => {
-      toast.success("Account created! Check your inbox to verify your email.");
+export const useRegister = () => {
+  const setUser = useAuthStore((s) => s.setUser);
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ username, name, password }: { username: string; name: string; password: string }) =>
+      register({ username, name, password }),
+    onSuccess: (user) => {
+      setUser(user);
+      qc.setQueryData(PROFILE_KEY, user);
+      toast.success("Account created! Welcome to Echo 🎵");
     },
     onError: (err: unknown) => {
       toast.error(extractMessage(err, "Something went wrong. Please try again."));
     },
   });
+};
 
 export const useGoogleAuth = () => {
   const setUser = useAuthStore((s) => s.setUser);
@@ -99,7 +104,6 @@ export const useLogout = () => {
       toast.error("Sign-out failed. Please try again.");
     },
     onSettled: () => {
-      // Always clear state locally, even if the server call fails
       clearUser();
       qc.removeQueries({ queryKey: PROFILE_KEY });
       router.replace("/login");
@@ -123,46 +127,6 @@ export const useUpdateProfile = () => {
     },
     onError: (err: unknown) => {
       toast.error(extractMessage(err, "Failed to save profile. Please try again."));
-    },
-  });
-};
-
-export const useResendVerification = () => {
-  return useMutation({
-    mutationFn: (email: string) =>
-      api.post(`${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/send-verification`, { email }).then((r) => r.data),
-    onSuccess: () => {
-      toast.success("Verification email sent! Check your inbox.");
-    },
-    onError: (err: unknown) => {
-      toast.error(extractMessage(err, "Failed to resend verification email."));
-    },
-  });
-};
-
-export const useVerifyEmail = () => {
-  const setUser = useAuthStore((s) => s.setUser);
-  const qc = useQueryClient();
-
-  return useMutation({
-    mutationFn: (token: string) => verifyEmail(token),
-    onSuccess: async () => {
-      toast.success("Email verified! Welcome to Echo 🎵");
-      // Re-fetch /user/me so isVerified flips to true in the store
-      try {
-        const { data } = await api.get(
-          `${process.env.NEXT_PUBLIC_BASE_URL}/api/user/me`
-        );
-        const freshUser = data.data;
-        setUser(freshUser);
-        qc.setQueryData(["auth", "me"], freshUser);
-      } catch {
-        // If re-fetch fails, invalidate so it refetches on next mount
-        qc.invalidateQueries({ queryKey: ["auth", "me"] });
-      }
-    },
-    onError: (err: unknown) => {
-      toast.error(extractMessage(err, "Email verification failed. The link may have expired."));
     },
   });
 };
