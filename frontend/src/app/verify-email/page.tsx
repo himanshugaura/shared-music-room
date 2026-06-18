@@ -116,11 +116,12 @@ function MailIcon() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+let globalVerifyFired = false;
+
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
-  const autoResend = searchParams.get("auto_resend") === "true";
 
   const user = useAuthStore((s) => s.user);
   const { mutate: verify, isPending: isVerifying, isSuccess, isError, error } = useVerifyEmail();
@@ -130,22 +131,13 @@ function VerifyEmailContent() {
   const [cooldown, setCooldown] = useState(0);
 
   // 1. Verify token if present
-  const verifyFired = useRef(false);
   useEffect(() => {
-    if (verifyFired.current || !token) return;
-    verifyFired.current = true;
+    if (globalVerifyFired || !token) return;
+    globalVerifyFired = true;
     verify(token);
   }, [token, verify]);
 
-  // 2. Auto resend if requested
-  const resendFired = useRef(false);
-  useEffect(() => {
-    if (resendFired.current || !autoResend || token || !user?.email) return;
-    resendFired.current = true;
-    resend(user.email, {
-      onSuccess: () => setCooldown(60),
-    });
-  }, [autoResend, token, resend, user?.email]);
+
 
   // 3. Cooldown timer
   useEffect(() => {

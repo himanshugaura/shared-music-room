@@ -11,6 +11,9 @@ import apiRouter from './routes/index.js';
 import { initializeSocket } from './socket/index.js';
 import { errorHandler } from './utils/errorHandler.js';
 const app = express();
+import dns from "node:dns";
+
+dns.setDefaultResultOrder("ipv4first");
 
 app.use(
   cors({
