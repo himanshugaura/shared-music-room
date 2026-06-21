@@ -1,0 +1,35 @@
+# Build output
+.next
+out
+
+# Dependencies
+node_modules
+
+# Environment & secrets — passed as build-args, not baked from .env
+.env
+.env.*
+!.env.production.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea
+*.swp
+
+# Git
+.git
+.gitignore
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Docs & misc
+README.md

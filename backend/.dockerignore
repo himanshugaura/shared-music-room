@@ -1,0 +1,29 @@
+# Dependencies & build artifacts
+node_modules
+dist
+
+# Environment & secrets — NEVER bake these into images
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor configs
+.vscode
+.idea
+*.swp
+
+# Git
+.git
+.gitignore
+
+# TypeScript cache
+*.tsbuildinfo
