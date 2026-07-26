@@ -1,5 +1,5 @@
 import type { MusicQueue } from '@prisma/client';
-import { Prisma } from '@prisma/client';
+import { type Prisma } from '@prisma/client';
 
 import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../utils/apiError.js';
@@ -230,7 +230,7 @@ export const getQueueState = async (roomId: string, userId?: string): Promise<Qu
 
   if (!queue) { throw new ApiError(404, 'Queue not found for this room'); }
 
-  let songsData = await findSongsByQueueId(queue.id);
+  const songsData = await findSongsByQueueId(queue.id);
   let songs: (QueueSongWithUser & { userVote?: 'up' | 'down' | null })[] = songsData;
 
   if (userId) {

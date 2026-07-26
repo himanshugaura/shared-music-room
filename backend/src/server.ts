@@ -5,15 +5,22 @@ import { createServer } from 'http';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
+import helmet from 'helmet';
+import dns from 'node:dns';
 
 import { connectDB } from './config/db.js';
+import { generalLimiter } from './middleware/rateLimiter.js';
 import apiRouter from './modules/index.js';
 import { initializeSocket } from './socket/index.js';
 import { errorHandler } from './utils/errorHandler.js';
-const app = express();
-import dns from "node:dns";
+import { logger } from './utils/logger.js';
 
-dns.setDefaultResultOrder("ipv4first");
+dns.setDefaultResultOrder('ipv4first');
+
+const app = express();
+
+// Security
+app.use(helmet());
 
 app.use(
   cors({
@@ -22,10 +29,15 @@ app.use(
   }),
 );
 
+// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// Global rate limit
+app.use('/api', generalLimiter);
+
+// Routes
 app.use('/api', apiRouter);
 
 app.use(errorHandler);
@@ -40,14 +52,14 @@ const startServer = async (): Promise<void> => {
   initializeSocket(httpServer);
 
   httpServer.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
+    logger.info(`Server running on http://localhost:${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
   });
 
   const shutdown = (signal: string) => {
-    console.log(`\n${signal} received — shutting down gracefully`);
+    logger.warn(`${signal} received — shutting down gracefully`);
     httpServer.close(() => {
-      console.log('HTTP server closed');
+      logger.info('HTTP server closed');
       process.exit(0);
     });
   };
@@ -57,6 +69,6 @@ const startServer = async (): Promise<void> => {
 };
 
 startServer().catch((error) => {
-  console.error('Failed to start server:', error);
+  logger.error({ err: error }, 'Failed to start server');
   process.exit(1);
 });
