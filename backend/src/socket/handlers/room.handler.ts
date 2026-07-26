@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import { findRoomExistsById } from '../../repositories/room.repository.js';
+import { findRoomExistsById } from '../../modules/room/room.service.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type RoomJoinPayload = { roomId: string };

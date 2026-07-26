@@ -1,16 +1,16 @@
 import type { Request, Response } from 'express';
+
 import {
   addTrackToQueueService,
   getQueueState,
   removeTrackFromQueueService,
   updateQueueSettingsService,
   voteOnTrack,
-} from '../services/musicQueue.service.js';
-import { getIO } from '../socket/index.js';
-import { ApiResponse } from '../utils/apiResponse.js';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import type { AddTrackBody, UpdateQueueSettingsBody, VoteBody } from '../validations/queue.validations.js';
-
+} from './queue.service.js';
+import { getIO } from '../../socket/index.js';
+import { ApiResponse } from '../../utils/apiResponse.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
+import type { AddTrackBody, UpdateQueueSettingsBody, VoteBody } from './queue.validations.js';
 
 export const getQueue = asyncHandler(async (req: Request, res: Response) => {
   const { roomId } = req.params as { roomId: string };
@@ -37,7 +37,6 @@ export const addTrack = asyncHandler(async (req: Request, res: Response) => {
 
   return new ApiResponse(201, song, 'Track added to queue').send(res);
 });
-
 
 export const removeTrack = asyncHandler(async (req: Request, res: Response) => {
   const { roomId, songId } = req.params as { roomId: string; songId: string };
@@ -80,4 +79,3 @@ export const voteTrack = asyncHandler(async (req: Request, res: Response) => {
 
   return new ApiResponse(200, song, 'Vote recorded').send(res);
 });
-

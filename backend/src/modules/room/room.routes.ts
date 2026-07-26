@@ -5,12 +5,12 @@ import {
   deleteRoom,
   getRoomDetails,
   listPublicRooms,
-} from '../controllers/room.controller.js';
-import { joinRoom, joinRoomByRoomCode } from '../controllers/user.controller.js';
-import { authMiddleware } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.js';
-import queueRouter from './queue.routes.js';
-import { createRoomBodySchema } from '../validations/room.validations.js';
+} from './room.controller.js';
+import { joinRoom, joinRoomByRoomCode } from '../user/user.controller.js';
+import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { validate } from '../../middleware/validate.js';
+import queueRouter from '../queue/queue.routes.js';
+import { createRoomBodySchema } from './room.validations.js';
 
 const router = Router();
 

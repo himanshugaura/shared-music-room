@@ -1,27 +1,60 @@
 import argon from 'argon2';
 import { OAuth2Client } from 'google-auth-library';
 import { nanoid } from 'nanoid';
+import type { Prisma, RefreshSession, User } from '@prisma/client';
 
-import {
-  createRefreshSession,
-  createUser,
-  deleteRefreshSessionById,
-  findRefreshSessionById,
-  findUserByEmail,
-  findUserById,
-  findUserByUsername,
-  updateRefreshSessionToken,
-} from '../repositories/auth.repository.js';
-import type {
-  AuthTokenResponse,
-  AuthUser,
-} from '../types/auth.types.js';
-import { ApiError } from '../utils/apiError.js';
+import { prisma } from '../../config/prisma.js';
+import type { AuthTokenResponse, AuthUser } from '../../types/auth.types.js';
+import { ApiError } from '../../utils/apiError.js';
 import {
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
-} from '../utils/jwt.js';
+} from '../../utils/jwt.js';
+
+// ─── DB layer (inlined) ──────────────────────────────────────────────────────
+
+export const findUserByEmail = async (email: string): Promise<User | null> =>
+  prisma.user.findUnique({ where: { email } });
+
+export const findUserByUsername = async (username: string): Promise<User | null> =>
+  prisma.user.findUnique({ where: { username } });
+
+export const findUserById = async (id: string): Promise<User | null> =>
+  prisma.user.findUnique({ where: { id } });
+
+export const createUser = async (data: Prisma.UserCreateInput): Promise<User> =>
+  prisma.user.create({ data });
+
+const createRefreshSession = async (data: {
+  sessionId: string;
+  userId: string;
+  refreshToken: string;
+  expiresAt: Date;
+}): Promise<RefreshSession> =>
+  prisma.refreshSession.create({
+    data: {
+      id: data.sessionId,
+      userId: data.userId,
+      refreshToken: data.refreshToken,
+      expiresAt: data.expiresAt,
+    },
+  });
+
+const findRefreshSessionById = async (sessionId: string): Promise<RefreshSession | null> =>
+  prisma.refreshSession.findUnique({ where: { id: sessionId } });
+
+const updateRefreshSessionToken = async (
+  sessionId: string,
+  refreshToken: string,
+): Promise<RefreshSession> =>
+  prisma.refreshSession.update({ where: { id: sessionId }, data: { refreshToken } });
+
+export const deleteRefreshSessionById = async (sessionId: string): Promise<void> => {
+  await prisma.refreshSession.delete({ where: { id: sessionId } });
+};
+
+// ─── Business logic ──────────────────────────────────────────────────────────
 
 const googleClient = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -52,12 +85,7 @@ const createSessionAndTokens = async (
   const hashedRefreshToken = await argon.hash(refreshToken);
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
-  await createRefreshSession({
-    sessionId,
-    userId,
-    refreshToken: hashedRefreshToken,
-    expiresAt,
-  });
+  await createRefreshSession({ sessionId, userId, refreshToken: hashedRefreshToken, expiresAt });
 
   const accessToken = generateAccessToken({ userId });
 
@@ -106,10 +134,7 @@ export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> =
     throw new ApiError(400, 'Authorization code is required');
   }
 
-  const { tokens } = await googleClient.getToken({
-    code,
-    redirect_uri: 'postmessage',
-  });
+  const { tokens } = await googleClient.getToken({ code, redirect_uri: 'postmessage' });
 
   if (!tokens.id_token) {
     throw new ApiError(401, 'Google did not return an ID token');

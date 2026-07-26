@@ -1,5 +1,5 @@
 import type { Socket } from 'socket.io';
-import { findUserProfileById } from '../../repositories/user.repository.js';
+import { findUserProfileById } from '../../modules/user/user.service.js';
 import { verifyAccessToken } from '../../utils/jwt.js';
 import type { AuthenticatedSocket } from '../types.js';
 

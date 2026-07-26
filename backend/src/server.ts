@@ -7,7 +7,7 @@ import cors from 'cors';
 import express from 'express';
 
 import { connectDB } from './config/db.js';
-import apiRouter from './routes/index.js';
+import apiRouter from './modules/index.js';
 import { initializeSocket } from './socket/index.js';
 import { errorHandler } from './utils/errorHandler.js';
 const app = express();

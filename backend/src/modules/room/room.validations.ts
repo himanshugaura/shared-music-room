@@ -14,4 +14,3 @@ export const createRoomBodySchema = z.object({
 });
 
 export type CreateRoomBody = z.infer<typeof createRoomBodySchema>;
-

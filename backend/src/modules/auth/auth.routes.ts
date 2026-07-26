@@ -6,13 +6,13 @@ import {
   logout,
   refreshAccessToken,
   register,
-} from '../controllers/auth.controller.js';
-import { validate } from '../middleware/validate.js';
+} from './auth.controller.js';
+import { validate } from '../../middleware/validate.js';
 import {
   googleAuthBodySchema,
   loginBodySchema,
   registerBodySchema,
-} from '../validations/auth.validations.js';
+} from './auth.validations.js';
 
 const router = Router();
 

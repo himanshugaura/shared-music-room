@@ -1,8 +1,8 @@
 import { Router } from 'express';
 
-import authRouter from './auth.routes.js';
-import roomRouter from './room.routes.js';
-import userRouter from './user.routes.js';
+import authRouter from './auth/auth.routes.js';
+import roomRouter from './room/room.routes.js';
+import userRouter from './user/user.routes.js';
 
 const router = Router();
 
@@ -15,4 +15,3 @@ router.use('/user', userRouter);
 router.use('/rooms', roomRouter);
 
 export default router;
-

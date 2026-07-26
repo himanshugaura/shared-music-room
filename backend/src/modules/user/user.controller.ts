@@ -8,9 +8,10 @@ import {
   joinRoom as joinRoomService,
   joinRoomByCode as joinRoomByCodeService,
   updateUserProfile,
-} from '../services/user.service.js';
-import { ApiResponse } from '../utils/apiResponse.js';
-import { asyncHandler } from '../utils/asyncHandler.js';
+} from './user.service.js';
+import { ApiResponse } from '../../utils/apiResponse.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
+import type { UpdateProfileInput } from './user.service.js';
 
 export const getProfile = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
@@ -25,10 +26,10 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
 
   const { name, username } = req.body as { name?: string; username?: string };
 
-  const input: import('../services/user.service.js').UpdateProfileInput = {};
-  if (name !== undefined) {input.name = name;}
-  if (username !== undefined) {input.username = username;}
-  if (req.file !== undefined) {input.file = req.file;}
+  const input: UpdateProfileInput = {};
+  if (name !== undefined) { input.name = name; }
+  if (username !== undefined) { input.username = username; }
+  if (req.file !== undefined) { input.file = req.file; }
 
   const user = await updateUserProfile(userId!, input);
 

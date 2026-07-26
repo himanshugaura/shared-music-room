@@ -6,14 +6,14 @@ import {
   removeTrack,
   updateQueueSettings,
   voteTrack,
-} from '../controllers/musicQueue.controller.js';
-import { authMiddleware } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.js';
+} from './queue.controller.js';
+import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { validate } from '../../middleware/validate.js';
 import {
   addTrackBodySchema,
   updateQueueSettingsBodySchema,
   voteBodySchema,
-} from '../validations/queue.validations.js';
+} from './queue.validations.js';
 
 const router = Router({ mergeParams: true });
 

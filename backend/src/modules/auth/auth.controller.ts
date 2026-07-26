@@ -1,15 +1,16 @@
 import type { CookieOptions, Request, Response } from 'express';
+
 import {
   googleAuthUser,
   loginUser,
   logoutUser,
   refreshTokens,
   registerUser,
-} from '../services/auth.service.js';
-import type { GoogleAuthBody, LoginBody, RegisterBody } from '../types/auth.types.js';
-import { ApiResponse } from '../utils/apiResponse.js';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { verifyRefreshToken } from '../utils/jwt.js';
+} from './auth.service.js';
+import type { GoogleAuthBody, LoginBody, RegisterBody } from './auth.validations.js';
+import { ApiResponse } from '../../utils/apiResponse.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
+import { verifyRefreshToken } from '../../utils/jwt.js';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 

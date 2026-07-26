@@ -1,6 +1,5 @@
 import type { Server } from 'socket.io';
-import { type QueueSongWithUser } from '../../repositories/queueSong.repository.js';
-import { addTrackToQueue } from '../../repositories/queueSong.repository.js';
+import { type QueueSongWithUser, addTrackToQueue } from '../../modules/queue/queue.service.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type TrackPayload = {

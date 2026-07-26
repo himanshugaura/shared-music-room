@@ -1,7 +1,7 @@
 import type { Server } from 'socket.io';
-import { findMusicQueueByRoomId, advanceToNextSong, setQueuePaused, setQueuePlaying, setQueueSeek } from '../../repositories/musicQueue.repository.js';
-import { findSongWithQueue } from '../../repositories/queueSong.repository.js';
-import { findRoomOwnerById } from '../../repositories/room.repository.js';
+import { findMusicQueueByRoomId, advanceToNextSong, setQueuePaused, setQueuePlaying, setQueueSeek } from '../../modules/queue/queue.service.js';
+import { findSongWithQueue } from '../../modules/queue/queue.service.js';
+import { findRoomOwnerById } from '../../modules/room/room.service.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type RoomPayload = { roomId: string };

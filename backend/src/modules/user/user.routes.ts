@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { upload } from '../config/multer.js';
+import { upload } from '../../config/multer.js';
 import {
   checkUsername,
   getProfile,
@@ -9,13 +9,13 @@ import {
   joinRoom,
   joinRoomByRoomCode,
   updateProfile,
-} from '../controllers/user.controller.js';
-import { authMiddleware } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.js';
+} from './user.controller.js';
+import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { validate } from '../../middleware/validate.js';
 import {
   checkUsernameBodySchema,
   updateProfileBodySchema,
-} from '../validations/user.validations.js';
+} from './user.validations.js';
 
 const router = Router();
 

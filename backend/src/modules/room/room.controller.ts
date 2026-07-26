@@ -5,10 +5,10 @@ import {
   deleteRoomService,
   getRoomDetailsService,
   listPublicRoomsService,
-} from '../services/room.service.js';
-import { ApiResponse } from '../utils/apiResponse.js';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import type { CreateRoomBody } from '../validations/room.validations.js';
+} from './room.service.js';
+import { ApiResponse } from '../../utils/apiResponse.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
+import type { CreateRoomBody } from './room.validations.js';
 
 export const createRoom = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.user?.id;
@@ -38,7 +38,7 @@ export const deleteRoom = asyncHandler(async (req: Request, res: Response) => {
 export const listPublicRooms = asyncHandler(async (_req: Request, res: Response) => {
   const rooms = await listPublicRoomsService();
 
-  return new ApiResponse(200, rooms, "Public rooms fetched successfully").send(res);
+  return new ApiResponse(200, rooms, 'Public rooms fetched successfully').send(res);
 });
 
 export const getRoomDetails = asyncHandler(async (req: Request, res: Response) => {
@@ -46,5 +46,5 @@ export const getRoomDetails = asyncHandler(async (req: Request, res: Response) =
 
   const room = await getRoomDetailsService(roomId);
 
-  return new ApiResponse(200, room, "Room details fetched successfully").send(res);
+  return new ApiResponse(200, room, 'Room details fetched successfully').send(res);
 });

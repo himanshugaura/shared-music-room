@@ -22,4 +22,3 @@ export const voteBodySchema = z.object({
 });
 
 export type VoteBody = z.infer<typeof voteBodySchema>;
-

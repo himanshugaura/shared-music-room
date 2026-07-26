@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 
-import { findUserProfileById } from '../repositories/user.repository.js';
+import { findUserProfileById } from '../modules/user/user.service.js';
 import { ApiError } from '../utils/apiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { verifyAccessToken } from '../utils/jwt.js';
