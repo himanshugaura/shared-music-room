@@ -8,11 +8,14 @@ import {
   registerUser,
 } from './auth.service.js';
 import type { GoogleAuthBody, LoginBody, RegisterBody } from './auth.validations.js';
+import { ApiError } from '../../utils/apiError.js';
 import { ApiResponse } from '../../utils/apiResponse.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { verifyRefreshToken } from '../../utils/jwt.js';
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+import { env } from '../../config/env.js';
+
+const IS_PRODUCTION = env.NODE_ENV === 'production';
 
 const ACCESS_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
@@ -94,8 +97,12 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
 export const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
   const incomingRefreshToken = req.cookies?.refreshToken as string | undefined;
 
+  if (!incomingRefreshToken) {
+    throw new ApiError(401, 'No refresh token provided');
+  }
+
   try {
-    const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken!);
+    const { newAccessToken, newRefreshToken } = await refreshTokens(incomingRefreshToken);
 
     setAuthCookies(res, newAccessToken, newRefreshToken);
 

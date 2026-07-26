@@ -1,5 +1,5 @@
 import type { Socket } from 'socket.io';
-import { findUserProfileById } from '../../modules/user/user.service.js';
+import { getUserProfileById } from '../../modules/user/user.service.js';
 import { verifyAccessToken } from '../../utils/jwt.js';
 import type { AuthenticatedSocket } from '../types.js';
 
@@ -31,7 +31,7 @@ export const socketAuthMiddleware = async (
     }
 
     const payload = verifyAccessToken(token);
-    const user = await findUserProfileById(payload.userId);
+    const user = await getUserProfileById(payload.userId);
 
     if (!user) {
       next(new Error('User not found'));

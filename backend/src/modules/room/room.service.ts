@@ -1,12 +1,10 @@
-import type { MusicQueue, Prisma, Room } from '@prisma/client';
+import type { Prisma, Room } from '@prisma/client';
 import { Prisma as PrismaClient } from '@prisma/client';
 import { customAlphabet } from 'nanoid';
 
 import { prisma } from '../../config/prisma.js';
 import type { CreateRoomInput, RoomSummary } from '../../types/room.types.js';
 import { ApiError } from '../../utils/apiError.js';
-
-// ─── DB layer (inlined) ──────────────────────────────────────────────────────
 
 const ROOM_SUMMARY_SELECT = {
   id: true,
@@ -17,35 +15,6 @@ const ROOM_SUMMARY_SELECT = {
   createdAt: true,
 } as const satisfies Prisma.RoomSelect;
 
-const createRoomRecord = async (data: Prisma.RoomCreateInput): Promise<Room> =>
-  prisma.room.create({ data });
-
-const deleteRoomById = async (roomId: string): Promise<Room> =>
-  prisma.room.delete({ where: { id: roomId } });
-
-export const findPublicRooms = async (): Promise<RoomSummary[]> =>
-  prisma.room.findMany({
-    where: { visibility: 'public' },
-    select: ROOM_SUMMARY_SELECT,
-    orderBy: { createdAt: 'desc' },
-  });
-
-export const findRoomById = async (roomId: string): Promise<Room | null> =>
-  prisma.room.findUnique({
-    where: { id: roomId },
-    include: {
-      owner: { select: { id: true, username: true, name: true, avatarUrl: true } },
-      members: {
-        include: {
-          user: { select: { id: true, username: true, name: true, avatarUrl: true } },
-        },
-      },
-    },
-  });
-
-export const findRoomByCode = async (roomCode: string): Promise<Pick<Room, 'id'> | null> =>
-  prisma.room.findUnique({ where: { roomCode }, select: { id: true } });
-
 export const findRoomExistsById = async (roomId: string): Promise<Pick<Room, 'id'> | null> =>
   prisma.room.findUnique({ where: { id: roomId }, select: { id: true } });
 
@@ -53,14 +22,6 @@ export const findRoomOwnerById = async (
   roomId: string,
 ): Promise<Pick<Room, 'id' | 'ownerId'> | null> =>
   prisma.room.findUnique({ where: { id: roomId }, select: { id: true, ownerId: true } });
-
-const createMusicQueueRecord = async (
-  roomId: string,
-  shuffleEnabled: boolean,
-): Promise<MusicQueue> =>
-  prisma.musicQueue.create({ data: { roomId, shuffleEnabled } });
-
-// ─── Business logic ──────────────────────────────────────────────────────────
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const ROOM_CODE_LENGTH = 6;
@@ -75,12 +36,14 @@ export const createRoomService = async (input: CreateRoomInput): Promise<Room> =
 
   for (let attempt = 0; attempt < MAX_ROOM_CODE_ATTEMPTS; attempt++) {
     try {
-      room = await createRoomRecord({
-        name,
-        description: description ?? null,
-        visibility,
-        roomCode: generateRoomCode(),
-        owner: { connect: { id: userId } },
+      room = await prisma.room.create({
+        data: {
+          name,
+          description: description ?? null,
+          visibility,
+          roomCode: generateRoomCode(),
+          owner: { connect: { id: userId } },
+        },
       });
       break;
     } catch (error) {
@@ -98,19 +61,46 @@ export const createRoomService = async (input: CreateRoomInput): Promise<Room> =
     throw new ApiError(500, 'Failed to generate a unique room code — please try again');
   }
 
-  await createMusicQueueRecord(room.id, shuffleEnabled ?? false);
+  await prisma.musicQueue.create({
+    data: {
+      roomId: room.id,
+      shuffleEnabled: shuffleEnabled ?? false,
+    },
+  });
 
   return room;
 };
 
 export const deleteRoomService = async (roomId: string, requesterId: string): Promise<Room> => {
-  const room = await findRoomOwnerById(roomId);
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    select: { id: true, ownerId: true },
+  });
+  
   if (!room) { throw new ApiError(404, 'Room not found'); }
   if (room.ownerId !== requesterId) { throw new ApiError(403, 'Only the room owner can delete this room'); }
-  return deleteRoomById(roomId);
+  
+  return prisma.room.delete({ where: { id: roomId } });
 };
 
-export const listPublicRoomsService = async (): Promise<RoomSummary[]> => findPublicRooms();
+export const listPublicRoomsService = async (): Promise<RoomSummary[]> => {
+  return prisma.room.findMany({
+    where: { visibility: 'public' },
+    select: ROOM_SUMMARY_SELECT,
+    orderBy: { createdAt: 'desc' },
+  });
+};
 
-export const getRoomDetailsService = async (roomId: string): Promise<Room | null> =>
-  findRoomById(roomId);
+export const getRoomDetailsService = async (roomId: string): Promise<Room | null> => {
+  return prisma.room.findUnique({
+    where: { id: roomId },
+    include: {
+      owner: { select: { id: true, username: true, name: true, avatarUrl: true } },
+      members: {
+        include: {
+          user: { select: { id: true, username: true, name: true, avatarUrl: true } },
+        },
+      },
+    },
+  });
+};

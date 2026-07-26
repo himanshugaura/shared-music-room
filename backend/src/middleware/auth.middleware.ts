@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 
-import { findUserProfileById } from '../modules/user/user.service.js';
+import { getUserProfileById } from '../modules/user/user.service.js';
 import { ApiError } from '../utils/apiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { verifyAccessToken } from '../utils/jwt.js';
@@ -27,7 +27,7 @@ export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, nex
     throw new ApiError(401, 'Invalid access token');
   }
 
-  const user = await findUserProfileById(userId);
+  const user = await getUserProfileById(userId);
 
   if (!user) {
     throw new ApiError(401, 'User not found');

@@ -1,67 +1,24 @@
 import argon from 'argon2';
 import { OAuth2Client } from 'google-auth-library';
 import { nanoid } from 'nanoid';
-import type { Prisma, RefreshSession, User } from '@prisma/client';
 
+import { env } from '../../config/env.js';
 import { prisma } from '../../config/prisma.js';
 import type { AuthTokenResponse, AuthUser } from '../../types/auth.types.js';
 import { ApiError } from '../../utils/apiError.js';
 import {
+  REFRESH_TOKEN_TTL_MS,
   generateAccessToken,
   generateRefreshToken,
   verifyRefreshToken,
 } from '../../utils/jwt.js';
 
-// ─── DB layer (inlined) ──────────────────────────────────────────────────────
-
-export const findUserByEmail = async (email: string): Promise<User | null> =>
-  prisma.user.findUnique({ where: { email } });
-
-export const findUserByUsername = async (username: string): Promise<User | null> =>
-  prisma.user.findUnique({ where: { username } });
-
-export const findUserById = async (id: string): Promise<User | null> =>
-  prisma.user.findUnique({ where: { id } });
-
-export const createUser = async (data: Prisma.UserCreateInput): Promise<User> =>
-  prisma.user.create({ data });
-
-const createRefreshSession = async (data: {
-  sessionId: string;
-  userId: string;
-  refreshToken: string;
-  expiresAt: Date;
-}): Promise<RefreshSession> =>
-  prisma.refreshSession.create({
-    data: {
-      id: data.sessionId,
-      userId: data.userId,
-      refreshToken: data.refreshToken,
-      expiresAt: data.expiresAt,
-    },
-  });
-
-const findRefreshSessionById = async (sessionId: string): Promise<RefreshSession | null> =>
-  prisma.refreshSession.findUnique({ where: { id: sessionId } });
-
-const updateRefreshSessionToken = async (
-  sessionId: string,
-  refreshToken: string,
-): Promise<RefreshSession> =>
-  prisma.refreshSession.update({ where: { id: sessionId }, data: { refreshToken } });
-
-export const deleteRefreshSessionById = async (sessionId: string): Promise<void> => {
-  await prisma.refreshSession.delete({ where: { id: sessionId } });
-};
-
-// ─── Business logic ──────────────────────────────────────────────────────────
-
 const googleClient = new OAuth2Client({
-  clientId: process.env.GOOGLE_CLIENT_ID!,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  clientId: env.GOOGLE_CLIENT_ID,
+  clientSecret: env.GOOGLE_CLIENT_SECRET,
 });
 
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const MAX_SESSIONS_PER_USER = 5;
 
 const toAuthUser = (user: {
   id: string;
@@ -80,12 +37,32 @@ const toAuthUser = (user: {
 const createSessionAndTokens = async (
   userId: string,
 ): Promise<{ accessToken: string; refreshToken: string }> => {
+  const existingSessions = await prisma.refreshSession.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+
+  if (existingSessions.length >= MAX_SESSIONS_PER_USER) {
+    const deleteCount = existingSessions.length - MAX_SESSIONS_PER_USER + 1;
+    const idsToDelete = existingSessions.slice(0, deleteCount).map((s) => s.id);
+    await prisma.refreshSession.deleteMany({ where: { id: { in: idsToDelete } } });
+  }
+
   const sessionId = nanoid();
   const refreshToken = generateRefreshToken({ userId, sessionId });
   const hashedRefreshToken = await argon.hash(refreshToken);
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
-  await createRefreshSession({ sessionId, userId, refreshToken: hashedRefreshToken, expiresAt });
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+
+  await prisma.refreshSession.create({
+    data: {
+      id: sessionId,
+      userId,
+      refreshToken: hashedRefreshToken,
+      expiresAt,
+    },
+  });
 
   const accessToken = generateAccessToken({ userId });
 
@@ -97,14 +74,16 @@ export const registerUser = async (
   name: string,
   password: string,
 ): Promise<AuthTokenResponse> => {
-  const existing = await findUserByUsername(username);
+  const existing = await prisma.user.findUnique({ where: { username } });
 
   if (existing) {
     throw new ApiError(409, 'Username is already taken');
   }
 
   const hashedPassword = await argon.hash(password);
-  const user = await createUser({ username, name, password: hashedPassword });
+  const user = await prisma.user.create({
+    data: { username, name, password: hashedPassword },
+  });
 
   const { accessToken, refreshToken } = await createSessionAndTokens(user.id);
 
@@ -115,7 +94,7 @@ export const loginUser = async (
   username: string,
   password: string,
 ): Promise<AuthTokenResponse> => {
-  const user = await findUserByUsername(username);
+  const user = await prisma.user.findUnique({ where: { username } });
 
   if (!user) { throw new ApiError(401, 'Invalid credentials'); }
   if (user.provider === 'google') { throw new ApiError(401, 'This account uses Google sign-in'); }
@@ -142,7 +121,7 @@ export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> =
 
   const ticket = await googleClient.verifyIdToken({
     idToken: tokens.id_token,
-    audience: process.env.GOOGLE_CLIENT_ID!,
+    audience: env.GOOGLE_CLIENT_ID,
   });
 
   const payload = ticket.getPayload();
@@ -151,19 +130,21 @@ export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> =
     throw new ApiError(401, 'Invalid Google token');
   }
 
-  let user = await findUserByEmail(payload.email);
+  let user = await prisma.user.findUnique({ where: { email: payload.email } });
 
   if (user && user.provider !== 'google') {
     throw new ApiError(409, 'Account already exists with username/password');
   }
 
   if (!user) {
-    user = await createUser({
-      email: payload.email,
-      name: payload.name ?? '',
-      googleId: payload.sub,
-      avatarUrl: payload.picture ?? null,
-      provider: 'google',
+    user = await prisma.user.create({
+      data: {
+        email: payload.email,
+        name: payload.name ?? '',
+        googleId: payload.sub,
+        avatarUrl: payload.picture ?? null,
+        provider: 'google',
+      },
     });
   }
 
@@ -173,27 +154,27 @@ export const googleAuthUser = async (code: string): Promise<AuthTokenResponse> =
 };
 
 export const logoutUser = async (sessionId: string): Promise<void> => {
-  await deleteRefreshSessionById(sessionId);
+  await prisma.refreshSession.deleteMany({ where: { id: sessionId } });
 };
 
 export const refreshTokens = async (
   incomingRefreshToken: string,
 ): Promise<{ newAccessToken: string; newRefreshToken: string }> => {
-  if (!incomingRefreshToken) { throw new ApiError(401, 'Unauthorized'); }
-
   const tokenPayload = verifyRefreshToken(incomingRefreshToken);
-  const session = await findRefreshSessionById(tokenPayload.sessionId);
 
+  const session = await prisma.refreshSession.findUnique({
+    where: { id: tokenPayload.sessionId },
+  });
   if (!session) { throw new ApiError(401, 'Unauthorized'); }
 
   if (session.expiresAt.getTime() <= Date.now()) {
-    await deleteRefreshSessionById(tokenPayload.sessionId);
+    await prisma.refreshSession.deleteMany({ where: { id: tokenPayload.sessionId } });
     throw new ApiError(401, 'Session expired');
   }
 
   const isValid = await argon.verify(session.refreshToken, incomingRefreshToken);
   if (!isValid) {
-    await deleteRefreshSessionById(tokenPayload.sessionId);
+    await prisma.refreshSession.deleteMany({ where: { id: tokenPayload.sessionId } });
     throw new ApiError(401, 'Unauthorized');
   }
 
@@ -201,10 +182,20 @@ export const refreshTokens = async (
     userId: tokenPayload.userId,
     sessionId: session.id,
   });
-  const hashedNewRefreshToken = await argon.hash(newRefreshToken);
   const newAccessToken = generateAccessToken({ userId: tokenPayload.userId });
+  const hashedNewRefreshToken = await argon.hash(newRefreshToken);
 
-  await updateRefreshSessionToken(session.id, hashedNewRefreshToken);
+  const { count } = await prisma.refreshSession.updateMany({
+    where: {
+      id: session.id,
+      refreshToken: session.refreshToken,
+    },
+    data: { refreshToken: hashedNewRefreshToken },
+  });
+
+  if (count === 0) {
+    throw new ApiError(401, 'Unauthorized');
+  }
 
   return { newAccessToken, newRefreshToken };
 };

@@ -1,22 +1,14 @@
-import type { MusicQueue } from '@prisma/client';
-import { type Prisma } from '@prisma/client';
-
+import type { MusicQueue, Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../utils/apiError.js';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type QueueSongWithUser = Prisma.QueueSongGetPayload<{
   include: { addedBy: { select: { username: true; name: true; avatarUrl: true } } };
 }>;
 
-// ─── DB layer (inlined from musicQueue.repository + queueSong.repository) ────
-
 const includeAddedBy = {
   addedBy: { select: { username: true, name: true, avatarUrl: true } },
 };
-
-// MusicQueue DB helpers
 
 export const findMusicQueueByRoomId = async (roomId: string): Promise<MusicQueue | null> =>
   prisma.musicQueue.findUnique({ where: { roomId } });
@@ -41,12 +33,6 @@ export const setQueueSeek = async (queueId: string, positionMs: number): Promise
     where: { id: queueId },
     data: { currentPositionMs: positionMs, playbackStartedAt: new Date() },
   });
-
-const updateQueueSettingsDb = async (
-  queueId: string,
-  settings: { shuffleEnabled?: boolean },
-): Promise<MusicQueue> =>
-  prisma.musicQueue.update({ where: { id: queueId }, data: settings });
 
 export const advanceToNextSong = async (
   queueId: string,
@@ -98,19 +84,17 @@ export const advanceToNextSong = async (
     });
   });
 
-// QueueSong DB helpers
-
 export const addTrackToQueue = async (
   roomId: string,
+  userId: string,
   trackData: {
     youtubeVideoId: string;
     title: string;
     thumbnail?: string | null;
     durationMs: number;
-    addedById: string;
   },
 ): Promise<QueueSongWithUser> => {
-  const musicQueue = await findMusicQueueByRoomId(roomId);
+  const musicQueue = await prisma.musicQueue.findUnique({ where: { roomId } });
 
   if (!musicQueue) {
     throw new ApiError(404, 'Music queue not found for the specified room.');
@@ -133,7 +117,7 @@ export const addTrackToQueue = async (
       thumbnail: trackData.thumbnail ?? null,
       durationMs: trackData.durationMs,
       position: nextPosition,
-      addedById: trackData.addedById,
+      addedById: userId,
     },
     include: includeAddedBy,
   });
@@ -153,19 +137,6 @@ export const addTrackToQueue = async (
   return newSong;
 };
 
-const findSongsByQueueId = async (queueId: string): Promise<QueueSongWithUser[]> =>
-  prisma.queueSong.findMany({
-    where: { queueId },
-    orderBy: { position: 'asc' },
-    include: includeAddedBy,
-  });
-
-export const findSongById = async (songId: string): Promise<QueueSongWithUser | null> =>
-  prisma.queueSong.findUnique({ where: { id: songId }, include: includeAddedBy });
-
-const removeTrackFromQueue = async (songId: string): Promise<QueueSongWithUser> =>
-  prisma.queueSong.delete({ where: { id: songId }, include: includeAddedBy });
-
 export const findSongWithQueue = async (
   songId: string,
 ): Promise<(QueueSongWithUser & { queue: { id: string; roomId: string } }) | null> =>
@@ -174,63 +145,21 @@ export const findSongWithQueue = async (
     include: { queue: { select: { id: true, roomId: true } }, ...includeAddedBy },
   });
 
-const upsertVote = async (
-  queueSongId: string,
-  userId: string,
-  voteType: 'up' | 'down',
-): Promise<QueueSongWithUser> =>
-  prisma.$transaction(async (tx) => {
-    await tx.songVote.upsert({
-      where: { queueSongId_userId: { queueSongId, userId } },
-      create: { queueSongId, userId, voteType },
-      update: { voteType },
-    });
-
-    const [upVotes, downVotes] = await Promise.all([
-      tx.songVote.count({ where: { queueSongId, voteType: 'up' } }),
-      tx.songVote.count({ where: { queueSongId, voteType: 'down' } }),
-    ]);
-
-    return tx.queueSong.update({
-      where: { id: queueSongId },
-      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
-      include: includeAddedBy,
-    });
-  });
-
-const deleteVote = async (
-  queueSongId: string,
-  userId: string,
-): Promise<QueueSongWithUser> =>
-  prisma.$transaction(async (tx) => {
-    await tx.songVote.delete({
-      where: { queueSongId_userId: { queueSongId, userId } },
-    });
-
-    const [upVotes, downVotes] = await Promise.all([
-      tx.songVote.count({ where: { queueSongId, voteType: 'up' } }),
-      tx.songVote.count({ where: { queueSongId, voteType: 'down' } }),
-    ]);
-
-    return tx.queueSong.update({
-      where: { id: queueSongId },
-      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
-      include: includeAddedBy,
-    });
-  });
-
-// ─── Business logic ──────────────────────────────────────────────────────────
-
 export type QueueState = MusicQueue & {
   songs: (QueueSongWithUser & { userVote?: 'up' | 'down' | null })[];
 };
 
 export const getQueueState = async (roomId: string, userId?: string): Promise<QueueState> => {
-  const queue = await findMusicQueueByRoomId(roomId);
+  const queue = await prisma.musicQueue.findUnique({ where: { roomId } });
 
   if (!queue) { throw new ApiError(404, 'Queue not found for this room'); }
 
-  const songsData = await findSongsByQueueId(queue.id);
+  const songsData = await prisma.queueSong.findMany({
+    where: { queueId: queue.id },
+    orderBy: { position: 'asc' },
+    include: includeAddedBy,
+  });
+
   let songs: (QueueSongWithUser & { userVote?: 'up' | 'down' | null })[] = songsData;
 
   if (userId) {
@@ -261,35 +190,25 @@ export const getQueueState = async (roomId: string, userId?: string): Promise<Qu
   return { ...queue, songs };
 };
 
-export const addTrackToQueueService = async (
-  roomId: string,
-  userId: string,
-  track: {
-    youtubeVideoId: string;
-    title: string;
-    thumbnail?: string | null;
-    durationMs: number;
-  },
-): Promise<QueueSongWithUser> =>
-  addTrackToQueue(roomId, { ...track, addedById: userId });
-
-export const removeTrackFromQueueService = async (
+export const removeTrackFromQueue = async (
   songId: string,
   requesterId: string,
 ): Promise<void> => {
-  const song = await findSongById(songId);
+  const song = await prisma.queueSong.findUnique({ where: { id: songId }, include: includeAddedBy });
   if (!song) { throw new ApiError(404, 'Song not found'); }
   if (song.addedById !== requesterId) { throw new ApiError(403, 'You can only remove songs you added'); }
-  await removeTrackFromQueue(songId);
+  
+  await prisma.queueSong.delete({ where: { id: songId } });
 };
 
-export const updateQueueSettingsService = async (
+export const updateQueueSettings = async (
   roomId: string,
   settings: { shuffleEnabled?: boolean },
 ): Promise<MusicQueue> => {
-  const queue = await findMusicQueueByRoomId(roomId);
+  const queue = await prisma.musicQueue.findUnique({ where: { roomId } });
   if (!queue) { throw new ApiError(404, 'Queue not found for this room'); }
-  return updateQueueSettingsDb(queue.id, settings);
+  
+  return prisma.musicQueue.update({ where: { id: queue.id }, data: settings });
 };
 
 export const voteOnTrack = async (
@@ -297,12 +216,44 @@ export const voteOnTrack = async (
   userId: string,
   voteType: 'up' | 'down' | 'remove',
 ): Promise<QueueSongWithUser> => {
-  const song = await findSongById(songId);
+  const song = await prisma.queueSong.findUnique({ where: { id: songId }, include: includeAddedBy });
   if (!song) { throw new ApiError(404, 'Song not found'); }
 
   if (voteType === 'remove') {
-    return deleteVote(song.id, userId);
+    return prisma.$transaction(async (tx) => {
+      await tx.songVote.delete({
+        where: { queueSongId_userId: { queueSongId: song.id, userId } },
+      });
+  
+      const [upVotes, downVotes] = await Promise.all([
+        tx.songVote.count({ where: { queueSongId: song.id, voteType: 'up' } }),
+        tx.songVote.count({ where: { queueSongId: song.id, voteType: 'down' } }),
+      ]);
+  
+      return tx.queueSong.update({
+        where: { id: song.id },
+        data: { upVotes, downVotes, voteScore: upVotes - downVotes },
+        include: includeAddedBy,
+      });
+    });
   }
 
-  return upsertVote(song.id, userId, voteType);
+  return prisma.$transaction(async (tx) => {
+    await tx.songVote.upsert({
+      where: { queueSongId_userId: { queueSongId: song.id, userId } },
+      create: { queueSongId: song.id, userId, voteType },
+      update: { voteType },
+    });
+
+    const [upVotes, downVotes] = await Promise.all([
+      tx.songVote.count({ where: { queueSongId: song.id, voteType: 'up' } }),
+      tx.songVote.count({ where: { queueSongId: song.id, voteType: 'down' } }),
+    ]);
+
+    return tx.queueSong.update({
+      where: { id: song.id },
+      data: { upVotes, downVotes, voteScore: upVotes - downVotes },
+      include: includeAddedBy,
+    });
+  });
 };

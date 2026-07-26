@@ -6,12 +6,13 @@ import { registerQueueHandlers } from './handlers/queue.handler.js';
 import { registerRoomHandlers } from './handlers/room.handler.js';
 import type { AuthenticatedSocket } from './types.js';
 
+import { env } from '../config/env.js';
 let io: Server | null = null;
 
 export const initializeSocket = (httpServer: HTTPServer): Server => {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL?.split(',') ?? ['http://localhost:3000'],
+      origin: env.CLIENT_URL.split(','),
       credentials: true,
     },
     transports: ['websocket', 'polling'],

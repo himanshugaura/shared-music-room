@@ -1,14 +1,17 @@
 import 'dotenv/config';
 
 import { createServer } from 'http';
+import dns from 'node:dns';
 
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
-import dns from 'node:dns';
+import { pinoHttp } from 'pino-http';
 
+import { env } from './config/env.js';
 import { connectDB } from './config/db.js';
+import { prisma } from './config/prisma.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import apiRouter from './modules/index.js';
 import { initializeSocket } from './socket/index.js';
@@ -24,10 +27,13 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    origin: env.FRONTEND_URL,
     credentials: true,
   }),
 );
+
+// Request logging
+app.use(pinoHttp({ logger }));
 
 // Body parsing
 app.use(express.json());
@@ -42,7 +48,7 @@ app.use('/api', apiRouter);
 
 app.use(errorHandler);
 
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = env.PORT;
 
 const startServer = async (): Promise<void> => {
   await connectDB();
@@ -53,13 +59,16 @@ const startServer = async (): Promise<void> => {
 
   httpServer.listen(PORT, () => {
     logger.info(`Server running on http://localhost:${PORT}`);
-    logger.info(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
+    logger.info(`Environment: ${env.NODE_ENV}`);
   });
 
-  const shutdown = (signal: string) => {
+  const shutdown = async (signal: string) => {
     logger.warn(`${signal} received — shutting down gracefully`);
-    httpServer.close(() => {
+    
+    httpServer.close(async () => {
       logger.info('HTTP server closed');
+      await prisma.$disconnect();
+      logger.info('Database disconnected');
       process.exit(0);
     });
   };

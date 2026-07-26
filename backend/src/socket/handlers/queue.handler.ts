@@ -22,10 +22,7 @@ export const registerQueueHandlers = (io: Server, socket: AuthenticatedSocket): 
       ack?: (res: AckResponse<QueueSongWithUser>) => void,
     ) => {
       try {
-        const song = await addTrackToQueue(roomId, {
-          ...track,
-          addedById: socket.user.id,
-        });
+        const song = await addTrackToQueue(roomId, socket.user.id, track);
 
         io.to(roomId).emit('queue:song_added', { roomId, song });
 
