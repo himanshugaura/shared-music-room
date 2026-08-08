@@ -17,6 +17,7 @@ import apiRouter from './modules/index.js';
 import { initializeSocket } from './socket/index.js';
 import { errorHandler } from './utils/errorHandler.js';
 import { logger } from './utils/logger.js';
+import { connectRedis } from './config/redis.js';
 
 dns.setDefaultResultOrder('ipv4first');
 
@@ -52,7 +53,7 @@ const PORT = env.PORT;
 
 const startServer = async (): Promise<void> => {
   await connectDB();
-
+  await connectRedis();
   const httpServer = createServer(app);
 
   initializeSocket(httpServer);

@@ -14,6 +14,7 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().min(1, 'Cloudinary API Secret is required'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   CLIENT_URL: z.string().default('http://localhost:3000'),
+  REDIS_URL: z.string().url().default('redis://localhost:6379'),
 });
 
 const _env = envSchema.safeParse(process.env);
