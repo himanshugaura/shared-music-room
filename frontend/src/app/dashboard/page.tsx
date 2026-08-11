@@ -14,7 +14,7 @@ import type { RoomSummary } from "@/types/room";
 /* ── Skeleton loader ────────────────────────────────────────────────── */
 function RoomSkeleton() {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 16 }}>
       {[1, 2, 3].map((i) => (
         <div
           key={i}
@@ -94,10 +94,10 @@ export default function DashboardPage() {
 
       <Navbar />
 
-      <main style={{ position: "relative", zIndex: 1, maxWidth: 1000, margin: "0 auto", padding: "100px 24px 80px" }}>
+      <main style={{ position: "relative", zIndex: 1, maxWidth: 1000, margin: "0 auto", padding: "100px 16px 80px" }} className="dashboard-main">
 
         {/* Page header */}
-        <div style={{ marginBottom: 28, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ marginBottom: 28, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }} className="dashboard-header">
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#eceff4", letterSpacing: "-0.02em" }}>
               Hey, {user?.name || user?.username || "there"} 👋
@@ -108,7 +108,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Action buttons */}
-          <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} className="dashboard-actions">
             <button
               id="explore-rooms-btn"
               type="button"
@@ -242,7 +242,7 @@ export default function DashboardPage() {
         )}
 
         {!isLoading && !isError && rooms.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 16 }}>
             {rooms.map((room) => (
               <RoomCard
                 key={room.id}
@@ -263,6 +263,33 @@ export default function DashboardPage() {
         @keyframes pulse {
           0%, 100% { opacity: 0.5; }
           50% { opacity: 0.9; }
+        }
+        @media (max-width: 640px) {
+          .dashboard-main {
+            padding-top: 80px !important;
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+          }
+          .dashboard-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+          .dashboard-actions {
+            width: 100%;
+          }
+          .dashboard-actions button {
+            flex: 1;
+            justify-content: center;
+            min-width: 0;
+          }
+        }
+        @media (max-width: 400px) {
+          .dashboard-actions {
+            flex-direction: column !important;
+          }
+          .dashboard-actions button {
+            width: 100% !important;
+          }
         }
       `}</style>
     </div>

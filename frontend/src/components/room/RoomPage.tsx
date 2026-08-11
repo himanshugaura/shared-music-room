@@ -64,6 +64,10 @@ export function RoomPage({ roomId }: { roomId: string }) {
     if (!song) return;
 
     didInitRef.current = true;
+    // calcPosition is called here — as late as possible — so the timestamp
+    // is maximally fresh.  PlayerPanel's pendingSyncRef will additionally
+    // apply a corrective seek once buffering finishes, accounting for the
+    // remaining gap between this call and the first PLAYING event.
     const startSeconds = calcPosition(queue);
     controlRef.current.loadVideo(song.youtubeVideoId, startSeconds, isPlaying);
   }, [queue, isPlayerReady]);
@@ -73,9 +77,13 @@ export function RoomPage({ roomId }: { roomId: string }) {
   const handleSocketPlay = useCallback((serverAt: number) => {
     const lagMs = Date.now() - serverAt;
     controlRef.current?.play();
-    // Compensate for lag by seeking slightly forward
+    // Compensate for network lag: after a short moment (so the player has
+    // actually started), seek forward by however many ms the event was in-flight.
     if (lagMs > 100) {
-      setTimeout(() => controlRef.current?.seekTo((controlRef.current as unknown as { getCurrentTime?: () => number }).getCurrentTime?.() ?? 0 + lagMs / 1000), 200);
+      setTimeout(() => {
+        const cur = controlRef.current?.getCurrentTime() ?? 0;
+        controlRef.current?.seekTo(Math.max(0, cur + lagMs / 1000));
+      }, 200);
     }
   }, []);
 
@@ -195,6 +203,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
         background: "#0b0f16",
         overflow: "hidden",
       }}
+      className="room-root"
     >
       <RoomHeader
         room={room}
@@ -237,9 +246,33 @@ export function RoomPage({ roomId }: { roomId: string }) {
       {/* Responsive: stack on small screens */}
       <style>{`
         @media (max-width: 768px) {
+          .room-root {
+            height: auto !important;
+            overflow: visible !important;
+            min-height: 100dvh;
+          }
           .room-grid {
             grid-template-columns: 1fr !important;
-            grid-template-rows: 1fr 1fr;
+            grid-template-rows: auto auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+          }
+          /* On mobile, give the player a fixed aspect ratio */
+          .room-grid > section:first-child {
+            height: auto !important;
+            min-height: 0 !important;
+          }
+          .room-grid > section:first-child > div:first-child {
+            flex: none !important;
+            aspect-ratio: 16 / 9;
+            min-height: 0 !important;
+          }
+          /* Queue panel: no border-left, add border-top instead */
+          .room-grid > aside {
+            height: auto !important;
+            min-height: 300px;
+            border-left: none !important;
+            border-top: 1px solid rgba(255,255,255,0.06) !important;
           }
         }
       `}</style>

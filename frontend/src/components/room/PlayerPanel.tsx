@@ -38,6 +38,7 @@ export interface PlayerControls {
   pause: () => void;
   seekTo: (seconds: number) => void;
   loadVideo: (videoId: string, startSeconds?: number, autoplay?: boolean) => void;
+  getCurrentTime: () => number;
 }
 
 interface Props {
@@ -82,6 +83,14 @@ export function PlayerPanel({
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
 
+  /**
+   * Pending position sync: set when loadVideo is called with autoplay=true.
+   * On the first PLAYING state-change after the load (which fires *after*
+   * buffering completes), we seek to positionMs + elapsed so the video lands
+   * at exactly the right spot regardless of how long buffering took.
+   */
+  const pendingSyncRef = useRef<{ positionMs: number; requestedAt: number } | null>(null);
+
   // ── Init YouTube player ───────────────────────────────────────────────────
 
   useEffect(() => {
@@ -117,6 +126,26 @@ export function PlayerPanel({
               setIsPlaying(true);
               setBuffering(false);
               setDuration(ytRef.current?.getDuration() ?? 0);
+
+              // ── Corrective seek after buffering ──────────────────────
+              // The YT API's startSeconds is often ignored on cold-start.
+              // We recorded positionMs + the wall-clock time when loadVideo
+              // was called. Now that playback has actually started we can
+              // compute the exact target and snap to it.
+              if (pendingSyncRef.current) {
+                const { positionMs, requestedAt } = pendingSyncRef.current;
+                pendingSyncRef.current = null; // consume — only run once per load
+                const elapsedMs = Date.now() - requestedAt;
+                const targetSec = Math.max(0, (positionMs + elapsedMs) / 1000);
+                // Only seek if we'd end up more than 1 s away from where the
+                // player naturally landed (avoids a jarring seek on fast loads
+                // that already landed in the right spot).
+                const actualSec = ytRef.current?.getCurrentTime() ?? 0;
+                if (Math.abs(actualSec - targetSec) > 1) {
+                  ytRef.current?.seekTo(targetSec, true);
+                  setCurrentSec(targetSec);
+                }
+              }
             } else if (data === YS.PAUSED) {
               setIsPlaying(false);
             } else if (data === YS.BUFFERING) {
@@ -158,10 +187,18 @@ export function PlayerPanel({
       play: () => { ytRef.current?.playVideo(); },
       pause: () => { ytRef.current?.pauseVideo(); },
       seekTo: (seconds) => { ytRef.current?.seekTo(seconds, true); setCurrentSec(seconds); },
+      getCurrentTime: () => ytRef.current?.getCurrentTime() ?? 0,
       loadVideo: (videoId, startSeconds = 0, autoplay = true) => {
         if (autoplay) {
+          // Record intent before calling the API so requestedAt is as close
+          // as possible to the actual network request being made.
+          pendingSyncRef.current = {
+            positionMs: startSeconds * 1000,
+            requestedAt: Date.now(),
+          };
           ytRef.current?.loadVideoById({ videoId, startSeconds });
         } else {
+          pendingSyncRef.current = null; // cued videos don't need correction
           ytRef.current?.cueVideoById({ videoId, startSeconds });
         }
         setCurrentSec(startSeconds);
@@ -205,6 +242,7 @@ export function PlayerPanel({
 
   return (
     <section
+      className="player-panel"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -441,6 +479,14 @@ export function PlayerPanel({
           </div>
         )}
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .player-panel > div:last-of-type {
+            padding: 12px 14px !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }
