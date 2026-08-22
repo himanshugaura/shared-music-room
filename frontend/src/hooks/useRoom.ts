@@ -39,8 +39,7 @@ export function useQueue(roomId: string) {
   return useQuery({
     queryKey: roomKeys.queue(roomId),
     queryFn: () => roomService.getQueue(roomId),
-    staleTime: Infinity, // Socket events keep it fresh
-    refetchOnWindowFocus: false,
+    staleTime: Infinity, // WebSockets handle live updates, no polling needed
   });
 }
 

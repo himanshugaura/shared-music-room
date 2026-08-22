@@ -16,10 +16,9 @@ import { toast } from "sonner";
 
 import { getSocket } from "./useSocket";
 import { roomKeys } from "./useRoom";
+import { useAuthStore } from "@/store";
 import type { Socket } from "socket.io-client";
 import type { QueueSong, QueueState } from "@/types/room";
-
-// ── Callback types ────────────────────────────────────────────────────────────
 
 export interface RoomSocketCallbacks {
   /** Server confirmed play; `serverAt` is server timestamp for lag correction */
@@ -35,6 +34,9 @@ export interface RoomSocketCallbacks {
 export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {}) {
   const qc = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
+  
+  // Retrieve current user ID to deduplicate self-triggered optimistic events
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   // Always reference the latest callbacks without re-registering listeners
   const cbRef = useRef(callbacks);
@@ -98,7 +100,11 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         });
       };
 
-      const onSongVoted = ({ song }: { song: QueueSong }) => {
+      const onSongVoted = ({ song, userId }: { song: QueueSong; userId: string }) => {
+        // If we triggered this vote, our optimistic UI already handled it perfectly.
+        // Ignoring the socket event entirely prevents any possibility of flickering.
+        if (userId === currentUserId) return;
+
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
           

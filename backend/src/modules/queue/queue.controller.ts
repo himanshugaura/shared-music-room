@@ -70,13 +70,11 @@ export const voteTrack = asyncHandler(async (req: Request, res: Response) => {
   const { voteType } = req.body as VoteBody;
 
   const song = await voteOnTrack(songId, userId, voteType);
-  const queueState = await getQueueState(roomId);
 
-  if (queueState.shuffleEnabled) {
-    getIO().to(roomId).emit('queueUpdated', { queue: queueState });
-  } else {
-    getIO().to(roomId).emit('queue:song_voted', { song });
-  }
+  // Broadcast just the updated song scores. 
+  // We attach userId so the sender's frontend knows to ignore this event 
+  // and trust its own optimistic UI, eliminating all flicker.
+  getIO().to(roomId).emit('queue:song_voted', { song, userId });
 
   return new ApiResponse(200, song, 'Vote recorded').send(res);
 });
