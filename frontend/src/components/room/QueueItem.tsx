@@ -20,14 +20,22 @@ interface Props {
 export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId, currentUserId, isOwner }: Props) {
   const { mutate: removeTrack, isPending: removing } = useRemoveTrack(roomId);
   const { mutate: vote, isPending: voting } = useVoteTrack(roomId);
+  const voteLockRef = React.useRef(false);
 
   function handleVote(type: "up" | "down") {
+    // 1. Synchronously block accidental double-clicks (stops spam bugs)
+    if (voteLockRef.current) return;
+    voteLockRef.current = true;
+
+    // 2. Reddit-style logic: if you click the same button, it removes your vote. Otherwise it votes/swaps.
     const prevVote = song.userVote ?? null;
     const next: "up" | "down" | "remove" = prevVote === type ? "remove" : type;
-    vote({
-      songId: song.id,
-      voteType: next,
-    });
+
+    // 3. Fire mutation (optimistic UI happens instantly)
+    vote(
+      { songId: song.id, voteType: next },
+      { onSettled: () => { voteLockRef.current = false; } }
+    );
   }
 
   const canRemove = isOwner || song.addedById === currentUserId;
@@ -118,28 +126,24 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button
           onClick={() => handleVote("up")}
-          disabled={voting}
-          title="Upvote"
+          title={song.userVote === "up" ? "Remove vote" : "Upvote"}
           style={{
             padding: "4px 7px", borderRadius: 6, border: "none", cursor: "pointer",
             background: song.userVote === "up" ? "rgba(163,190,140,0.25)" : "rgba(255,255,255,0.04)",
             color: song.userVote === "up" ? "#a3be8c" : "#6b7a8d",
             fontSize: 13, transition: "all 0.12s",
-            opacity: voting ? 0.5 : 1,
           }}
         >
           ▲
         </button>
         <button
           onClick={() => handleVote("down")}
-          disabled={voting}
-          title="Downvote"
+          title={song.userVote === "down" ? "Remove vote" : "Downvote"}
           style={{
             padding: "4px 7px", borderRadius: 6, border: "none", cursor: "pointer",
             background: song.userVote === "down" ? "rgba(191,97,106,0.2)" : "rgba(255,255,255,0.04)",
             color: song.userVote === "down" ? "#bf616a" : "#6b7a8d",
             fontSize: 13, transition: "all 0.12s",
-            opacity: voting ? 0.5 : 1,
           }}
         >
           ▼

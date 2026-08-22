@@ -95,33 +95,62 @@ export function useVoteTrack(roomId: string) {
       songId: string;
       voteType: "up" | "down" | "remove";
     }) => roomService.voteTrack(roomId, songId, voteType),
-    onSuccess: (updated: QueueSong, variables) => {
-      qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) =>
-        prev
-          ? {
-              ...prev,
-              songs: prev.songs
-                .map((s) => (s.id === updated.id ? { ...updated, userVote: variables.voteType === "remove" ? null : variables.voteType } : s))
-                .sort((a, b) => b.voteScore - a.voteScore || a.position - b.position)
-            }
-          : prev
-      );
+    
+    // 1. Optimistic update — happens instantly on click
+    onMutate: async (variables) => {
+      await qc.cancelQueries({ queryKey: roomKeys.queue(roomId) });
+      const previousState = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
+
+      if (previousState) {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+
+          // Compute optimistic deltas
+          let newSongs = prev.songs.map((s) => {
+            if (s.id !== variables.songId) return s;
+            const prevVote = s.userVote;
+            const upDelta = variables.voteType === "up" ? 1 : prevVote === "up" ? -1 : 0;
+            const downDelta = variables.voteType === "down" ? 1 : prevVote === "down" ? -1 : 0;
+            return {
+              ...s,
+              upVotes: s.upVotes + upDelta,
+              downVotes: s.downVotes + downDelta,
+              voteScore: s.voteScore + upDelta - downDelta,
+              userVote: variables.voteType === "remove" ? null : variables.voteType,
+            };
+          });
+
+          // We no longer automatically re-sort on every vote. 
+          // The song just updates its score in place.
+          // Sorting is now a manual admin action.
+          newSongs.sort((a, b) => a.position - b.position);
+
+          return { ...prev, songs: newSongs };
+        });
+      }
+
+      return { previousState };
     },
-    onError: (err) => toast.error(msg(err, "Vote failed.")),
+
+    // 2. Revert on failure
+    onError: (err, variables, context) => {
+      if (context?.previousState) {
+        qc.setQueryData(roomKeys.queue(roomId), context.previousState);
+      }
+      toast.error(msg(err, "Vote failed."));
+    },
   });
 }
 
-export function useUpdateQueueSettings(roomId: string) {
+export function useSortQueueByVotes(roomId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (settings: { shuffleEnabled: boolean }) =>
-      roomService.updateQueueSettings(roomId, settings),
-    onSuccess: (_, vars) => {
-      qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) =>
-        prev ? { ...prev, shuffleEnabled: vars.shuffleEnabled } : prev
-      );
-      toast.success(`Shuffle ${vars.shuffleEnabled ? "on" : "off"}.`);
+    mutationFn: () => roomService.sortQueueByVotes(roomId),
+    onSuccess: () => {
+      // Invalidate so we pull the newly sorted list directly from the server.
+      qc.invalidateQueries({ queryKey: roomKeys.queue(roomId) });
+      toast.success(`Queue sorted by votes.`);
     },
-    onError: (err) => toast.error(msg(err, "Could not update settings.")),
+    onError: (err) => toast.error(msg(err, "Could not sort queue.")),
   });
 }

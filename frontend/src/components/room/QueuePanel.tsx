@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { QueueItem } from "./QueueItem";
 import { AddSongModal } from "./AddSongModal";
+import { useSortQueueByVotes } from "@/hooks/useRoom";
 import type { QueueState } from "@/types/room";
 
 interface Props {
@@ -14,12 +15,11 @@ interface Props {
 
 export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
   const [addOpen, setAddOpen] = useState(false);
+  const { mutate: sortQueue, isPending: sorting } = useSortQueueByVotes(roomId);
 
   const filteredAndSorted = useMemo(() => {
     const songs = queue?.songs ?? [];
     return songs.filter((song) => song.id !== queue?.currentQueueSongId);
-    // Note: We no longer manually sort here because the backend sends them perfectly ordered 
-    // according to whether shuffle (voting order) is enabled or not.
   }, [queue?.songs, queue?.currentQueueSongId]);
 
   return (
@@ -52,31 +52,74 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
           </p>
         </div>
 
-        <button
-          onClick={() => setAddOpen(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 12px",
-            borderRadius: 8,
-            border: "none",
-            background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
-            color: "#0f1117",
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: "pointer",
-            transition: "opacity 0.15s",
-          }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.85")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Add song
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {isOwner && (
+            <button
+              onClick={() => sortQueue()}
+              disabled={sorting || filteredAndSorted.length < 2}
+              title="Sort upcoming songs by votes"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.04)",
+                color: "#d8dee9",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: sorting || filteredAndSorted.length < 2 ? "not-allowed" : "pointer",
+                transition: "all 0.15s",
+                opacity: sorting || filteredAndSorted.length < 2 ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!sorting && filteredAndSorted.length >= 2) {
+                  (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.15)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#a3be8c";
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.3)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)";
+                (e.currentTarget as HTMLButtonElement).style.color = "#d8dee9";
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.1)";
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 21V3" />
+                <path d="M5 10l7-7 7 7" />
+              </svg>
+              Sort by Votes
+            </button>
+          )}
+
+          <button
+            onClick={() => setAddOpen(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: "none",
+              background: "linear-gradient(135deg, #a3be8c 0%, #8faa78 100%)",
+              color: "#0f1117",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "opacity 0.15s",
+            }}
+            onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.85")}
+            onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Add song
+          </button>
+        </div>
       </div>
 
       {/* Song list */}

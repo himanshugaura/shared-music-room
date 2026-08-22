@@ -77,10 +77,7 @@ export const roomService = {
     return data.data;
   },
 
-  updateQueueSettings: async (
-    roomId: string,
-    settings: { shuffleEnabled: boolean }
-  ): Promise<void> => {
-    await api.patch(`${BASE}/rooms/${roomId}/queue/settings`, settings);
+  sortQueueByVotes: async (roomId: string): Promise<void> => {
+    await api.post(`${BASE}/rooms/${roomId}/queue/sort-by-votes`);
   },
 };
