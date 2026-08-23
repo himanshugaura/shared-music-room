@@ -138,3 +138,15 @@ export const joinRoomByCode = async (roomCode: string, userId: string): Promise<
 
   await prisma.roomMember.create({ data: { roomId: room.id, userId } });
 };
+
+export const leaveRoom = async (roomId: string, userId: string): Promise<void> => {
+  const existing = await prisma.roomMember.findUnique({
+    where: { roomId_userId: { roomId, userId } },
+  });
+  
+  if (!existing) { throw new ApiError(404, 'You are not a member of this room'); }
+  
+  await prisma.roomMember.delete({
+    where: { roomId_userId: { roomId, userId } },
+  });
+};

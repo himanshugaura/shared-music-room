@@ -99,3 +99,19 @@ export function useDeleteRoom() {
     },
   });
 }
+
+export function useLeaveRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (roomId: string) => roomService.leaveRoom(roomId),
+    onSuccess: (_data, roomId) => {
+      qc.setQueryData<RoomSummary[]>(KEYS.joined, (prev = []) =>
+        prev.filter((r) => r.id !== roomId)
+      );
+      toast.success("You left the room.");
+    },
+    onError: (err: unknown) => {
+      toast.error(extractMessage(err, "Failed to leave room. Please try again."));
+    },
+  });
+}

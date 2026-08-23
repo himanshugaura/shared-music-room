@@ -36,6 +36,10 @@ export const roomService = {
     await api.post(`${BASE}/rooms/${roomId}/join`);
   },
 
+  leaveRoom: async (roomId: string): Promise<void> => {
+    await api.delete(`${BASE}/rooms/${roomId}/leave`);
+  },
+
   deleteRoom: async (roomId: string): Promise<void> => {
     await api.delete(`${BASE}/rooms/${roomId}`);
   },

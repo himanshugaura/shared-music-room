@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { RoomSummary } from "@/types/room";
-import { useDeleteRoom } from "@/hooks/useRooms";
+import { useDeleteRoom, useLeaveRoom } from "@/hooks/useRooms";
 
 function VisibilityBadge({ visibility }: { visibility: string }) {
   const isPublic = visibility === "public";
@@ -47,16 +47,22 @@ function formatDate(dateStr: string) {
 interface RoomCardProps {
   room: RoomSummary;
   isOwner?: boolean;
+  isJoined?: boolean;
   onEnter?: (room: RoomSummary) => void;
 }
 
-export default function RoomCard({ room, isOwner = false, onEnter }: RoomCardProps) {
+export default function RoomCard({ room, isOwner = false, isJoined = false, onEnter }: RoomCardProps) {
   const { mutate: deleteRoom, isPending: isDeleting } = useDeleteRoom();
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { mutate: leaveRoom, isPending: isLeaving } = useLeaveRoom();
+  const [confirmAction, setConfirmAction] = useState(false);
 
-  function handleDelete() {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
-    deleteRoom(room.id, { onSettled: () => setConfirmDelete(false) });
+  function handleDeleteOrLeave() {
+    if (!confirmAction) { setConfirmAction(true); return; }
+    if (isOwner) {
+      deleteRoom(room.id, { onSettled: () => setConfirmAction(false) });
+    } else if (isJoined) {
+      leaveRoom(room.id, { onSettled: () => setConfirmAction(false) });
+    }
   }
 
   return (
@@ -146,27 +152,27 @@ export default function RoomCard({ room, isOwner = false, onEnter }: RoomCardPro
           Enter
         </button>
 
-        {isOwner && (
+        {(isOwner || isJoined) && (
           <button
-            id={`delete-room-${room.id}`}
+            id={`action-room-${room.id}`}
             type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
+            onClick={handleDeleteOrLeave}
+            disabled={isDeleting || isLeaving}
             style={{
               padding: "8px 14px",
               borderRadius: 8,
-              border: confirmDelete ? "1px solid rgba(191,97,106,0.5)" : "1px solid rgba(255,255,255,0.08)",
-              background: confirmDelete ? "rgba(191,97,106,0.12)" : "rgba(255,255,255,0.04)",
-              color: confirmDelete ? "#bf616a" : "#6b7a8d",
+              border: confirmAction ? "1px solid rgba(191,97,106,0.5)" : "1px solid rgba(255,255,255,0.08)",
+              background: confirmAction ? "rgba(191,97,106,0.12)" : "rgba(255,255,255,0.04)",
+              color: confirmAction ? "#bf616a" : "#6b7a8d",
               fontSize: 12,
               fontWeight: 500,
-              cursor: isDeleting ? "not-allowed" : "pointer",
+              cursor: (isDeleting || isLeaving) ? "not-allowed" : "pointer",
               transition: "all 0.15s",
               whiteSpace: "nowrap",
             }}
-            onMouseLeave={() => setConfirmDelete(false)}
+            onMouseLeave={() => setConfirmAction(false)}
           >
-            {isDeleting ? "Deleting…" : confirmDelete ? "Confirm?" : "Delete"}
+            {isDeleting || isLeaving ? (isOwner ? "Deleting…" : "Leaving…") : confirmAction ? "Confirm?" : (isOwner ? "Delete" : "Leave")}
           </button>
         )}
       </div>

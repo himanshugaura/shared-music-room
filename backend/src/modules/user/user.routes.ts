@@ -8,6 +8,7 @@ import {
   getUserOwnedRooms,
   joinRoom,
   joinRoomByRoomCode,
+  leaveRoom,
   updateProfile,
 } from './user.controller.js';
 import { authMiddleware } from '../../middleware/auth.middleware.js';
@@ -28,6 +29,7 @@ router.get('/me/rooms/owned', authMiddleware, getUserOwnedRooms);
 router.get('/me/rooms/joined', authMiddleware, getUserJoinedRooms);
 
 router.post('/me/rooms/:roomId/join', authMiddleware, joinRoom);
+router.delete('/me/rooms/:roomId/leave', authMiddleware, leaveRoom);
 router.post('/me/rooms/join/:roomCode', authMiddleware, joinRoomByRoomCode);
 
 export default router;

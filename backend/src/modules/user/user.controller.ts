@@ -7,6 +7,7 @@ import {
   getUserProfile,
   joinRoom as joinRoomService,
   joinRoomByCode as joinRoomByCodeService,
+  leaveRoom as leaveRoomService,
   updateUserProfile,
 } from './user.service.js';
 import { ApiResponse } from '../../utils/apiResponse.js';
@@ -76,4 +77,13 @@ export const joinRoomByRoomCode = asyncHandler(async (req: Request, res: Respons
   await joinRoomByCodeService(roomCode, userId!);
 
   return new ApiResponse(200, null, 'Joined room successfully').send(res);
+});
+
+export const leaveRoom = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  const { roomId } = req.params as { roomId: string };
+
+  await leaveRoomService(roomId, userId!);
+
+  return new ApiResponse(200, null, 'Left room successfully').send(res);
 });

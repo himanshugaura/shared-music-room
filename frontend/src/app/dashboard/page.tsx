@@ -248,6 +248,7 @@ export default function DashboardPage() {
                 key={room.id}
                 room={room}
                 isOwner={tab === "owned"}
+                isJoined={tab === "joined"}
                 onEnter={handleEnter}
               />
             ))}
