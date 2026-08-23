@@ -30,7 +30,7 @@ export const registerQueueHandlers = (io: Server, socket: AuthenticatedSocket): 
         if (autoStarted) {
           io.to(roomId).emit('player:play', { roomId, at: Date.now() });
           // Schedule server-side auto-skip for the full duration of the first song
-          scheduleAutoSkip(roomId, song.durationMs);
+          await scheduleAutoSkip(roomId, song.durationMs);
         }
 
         ack?.({ ok: true, data: song });

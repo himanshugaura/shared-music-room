@@ -56,7 +56,7 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         });
         if (song) {
           const remainingMs = song.durationMs - (state.currentPositionMs ?? 0);
-          scheduleAutoSkip(roomId, remainingMs);
+          await scheduleAutoSkip(roomId, remainingMs);
         }
       }
     } catch {
@@ -84,7 +84,7 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         }
 
         // Cancel the auto-skip — the song isn't playing anymore
-        cancelAutoSkip(roomId);
+        await cancelAutoSkip(roomId);
 
         socket.to(roomId).emit('player:pause', { roomId, currentPositionMs });
         ack?.({ ok: true });
@@ -125,7 +125,7 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
             select: { durationMs: true },
           });
           if (song) {
-            scheduleAutoSkip(roomId, song.durationMs - positionMs);
+            await scheduleAutoSkip(roomId, song.durationMs - positionMs);
           }
         }
       } catch {
@@ -154,7 +154,7 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         }
 
         // Cancel the pending auto-skip for the song being manually skipped
-        cancelAutoSkip(roomId);
+        await cancelAutoSkip(roomId);
 
         const updatedQueue = await advanceToNextSong(
           songWithQueue.queue.id,
@@ -183,7 +183,7 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
             select: { durationMs: true },
           });
           if (nextSong) {
-            scheduleAutoSkip(roomId, nextSong.durationMs);
+            await scheduleAutoSkip(roomId, nextSong.durationMs);
           }
         }
       } catch {

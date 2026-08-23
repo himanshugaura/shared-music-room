@@ -163,7 +163,7 @@ export const autoSkipWorker = new Worker<AutoSkipJobData>(
       });
 
       if (nextSong) {
-        scheduleAutoSkip(roomId, nextSong.durationMs);
+        await scheduleAutoSkip(roomId, nextSong.durationMs);
       }
     }
   },

@@ -447,38 +447,48 @@ export const voteOnTrack = async (
 /**
  * Schedules a server-side auto-skip for a room.
  *
- * A fixed jobId (`auto-skip:{roomId}`) means there is ALWAYS at most one
- * pending job per room. Calling this again replaces the previous job, which
- * is exactly what we want when the admin seeks or a new song starts.
+ * Always removes any existing job first — BullMQ does NOT replace delayed
+ * jobs with the same jobId; it throws. We must explicitly remove-then-add
+ * to guarantee the countdown always reflects the latest position.
  *
  * @param roomId      The room to schedule for.
  * @param remainingMs Milliseconds until the current song ends.
  */
-export const scheduleAutoSkip = (roomId: string, remainingMs: number): void => {
-  // Add a small buffer (500 ms) so the job doesn't fire a hair too early
-  // due to clock drift between when we measured and when BullMQ fires.
-  const delay = Math.max(0, remainingMs) + 500;
+export const scheduleAutoSkip = async (roomId: string, remainingMs: number): Promise<void> => {
+  const jobId = `auto-skip:${roomId}`;
 
-  autoSkipQueue.add(
-    'auto-skip',
-    { roomId },
-    {
-      jobId: `auto-skip:${roomId}`,
-      delay,
-      // If a job with this ID already exists (waiting/delayed), replace it.
-      // This means seek/play always gets a fresh countdown.
-    },
-  ).catch((err: unknown) => {
-    logger.warn({ roomId, err }, 'auto-skip: failed to enqueue job (non-critical)');
-  });
+  try {
+    // Remove any existing delayed job for this room before adding a new one.
+    // This is required because BullMQ throws if you add a duplicate jobId.
+    const existing = await autoSkipQueue.getJob(jobId);
+    if (existing) {
+      await existing.remove();
+    }
+
+    // Add a small buffer (500 ms) to account for clock drift.
+    const delay = Math.max(0, remainingMs) + 500;
+
+    await autoSkipQueue.add('auto-skip', { roomId }, { jobId, delay });
+    logger.debug({ roomId, remainingMs, delay }, 'auto-skip: job scheduled');
+  } catch (err: unknown) {
+    logger.warn({ roomId, err }, 'auto-skip: failed to schedule job (non-critical)');
+  }
 };
 
 /**
  * Cancels any pending auto-skip job for a room.
- * Call this on pause, manual skip, or when the queue empties.
+ * Call this on pause or when the queue empties.
+ * Manual skip calls this then schedules for the next song immediately.
  */
-export const cancelAutoSkip = (roomId: string): void => {
-  autoSkipQueue.remove(`auto-skip:${roomId}`).catch((err: unknown) => {
+export const cancelAutoSkip = async (roomId: string): Promise<void> => {
+  try {
+    const jobId = `auto-skip:${roomId}`;
+    const existing = await autoSkipQueue.getJob(jobId);
+    if (existing) {
+      await existing.remove();
+      logger.debug({ roomId }, 'auto-skip: job cancelled');
+    }
+  } catch (err: unknown) {
     logger.warn({ roomId, err }, 'auto-skip: failed to cancel job (non-critical)');
-  });
+  }
 };
