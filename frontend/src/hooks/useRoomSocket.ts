@@ -67,7 +67,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       const onPlay = ({ at }: { at: number }) => {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
-          return { ...prev, isPlaying: true, playbackStartedAt: new Date(at) };
+          return { ...prev, isPlaying: true, playbackStartedAt: new Date(at).toISOString() };
         });
         cbRef.current.onPlay?.(at);
       };
@@ -83,7 +83,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       const onSeek = ({ positionMs, at }: { positionMs: number; at: number }) => {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
-          return { ...prev, currentPositionMs: positionMs, playbackStartedAt: new Date(at) };
+          return { ...prev, currentPositionMs: positionMs, playbackStartedAt: new Date(at).toISOString() };
         });
         cbRef.current.onSeek?.(positionMs);
       };

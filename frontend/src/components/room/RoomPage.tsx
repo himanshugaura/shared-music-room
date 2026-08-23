@@ -140,7 +140,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
     controlRef.current?.play();
     qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
       if (!prev) return prev;
-      return { ...prev, isPlaying: true, playbackStartedAt: new Date() };
+      return { ...prev, isPlaying: true, playbackStartedAt: new Date().toISOString() };
     });
     emitPlay();
   }, [emitPlay, qc, roomId]);
@@ -158,7 +158,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
     controlRef.current?.seekTo(positionMs / 1000);
     qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
       if (!prev) return prev;
-      return { ...prev, currentPositionMs: positionMs, playbackStartedAt: new Date() };
+      return { ...prev, currentPositionMs: positionMs, playbackStartedAt: new Date().toISOString() };
     });
     emitSeek(positionMs);
   }, [emitSeek, qc, roomId]);
