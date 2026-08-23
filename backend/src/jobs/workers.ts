@@ -11,7 +11,9 @@
 import { Worker } from 'bullmq';
 import { prisma } from '../config/prisma.js';
 import { createBullMQConnection } from '../config/redis.js';
-import { getPlayerState } from '../redis/player.js';
+import { getPlayerState, patchPlayerState } from '../redis/player.js';
+import { advanceToNextSong, scheduleAutoSkip } from '../modules/queue/queue.service.js';
+import { getIO } from '../socket/index.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -85,12 +87,106 @@ seekSyncWorker.on('error', (err) => {
   logger.error({ err }, 'seekSyncWorker connection error');
 });
 
+// ---------------------------------------------------------------------------
+// Auto-Skip Worker
+// ---------------------------------------------------------------------------
+
+type AutoSkipJobData = {
+  roomId: string;
+};
+
+/**
+ * Server-side song auto-advance.
+ *
+ * Fires when the current song's remaining playback time has elapsed.
+ * This allows the queue to advance naturally even when the admin's
+ * browser tab is closed — no client involvement required.
+ *
+ * Flow:
+ *  1. Read queue state from Redis to confirm we're still playing
+ *     (if paused or already skipped, bail out gracefully).
+ *  2. Call advanceToNextSong — same logic as the manual skip handler.
+ *  3. Sync Redis with the new Postgres state.
+ *  4. Emit player:skip to all connected clients.
+ *  5. If there's a next song, schedule the next auto-skip job.
+ */
+export const autoSkipWorker = new Worker<AutoSkipJobData>(
+  'auto-skip',
+  async (job) => {
+    const { roomId } = job.data;
+
+    logger.info({ roomId, jobId: job.id }, 'auto-skip: job fired');
+
+    // 1. Check current state — guard against stale jobs after a pause/manual skip
+    const state = await getPlayerState(roomId);
+    if (!state || !state.isPlaying || !state.currentQueueSongId) {
+      logger.info({ roomId }, 'auto-skip: room is paused or queue empty — skipping');
+      return;
+    }
+
+    // 2. Look up the current song's position so advanceToNextSong can find the next
+    const currentSong = await prisma.queueSong.findUnique({
+      where: { id: state.currentQueueSongId },
+      select: { id: true, position: true, queue: { select: { id: true } } },
+    });
+
+    if (!currentSong) {
+      logger.warn({ roomId }, 'auto-skip: current song not found in DB');
+      return;
+    }
+
+    // 3. Advance the queue — same Postgres transaction as the manual skip
+    const updatedQueue = await advanceToNextSong(currentSong.queue.id, currentSong.position);
+    const nextSongId = updatedQueue?.currentQueueSongId ?? null;
+
+    // 4. Sync Redis with the new state
+    if (updatedQueue) {
+      await patchPlayerState(roomId, {
+        isPlaying: updatedQueue.isPlaying,
+        currentPositionMs: 0,
+        playbackStartedAt: updatedQueue.playbackStartedAt,
+        currentQueueSongId: updatedQueue.currentQueueSongId,
+      }).catch(() => {/* swallowed — non-critical */});
+    }
+
+    // 5. Broadcast to all connected clients (same event as manual skip)
+    const at = Date.now();
+    getIO().to(roomId).emit('player:skip', { roomId, nextSongId, at });
+
+    logger.info({ roomId, nextSongId }, 'auto-skip: advanced to next song');
+
+    // 6. Schedule auto-skip for the next song if one exists
+    if (nextSongId) {
+      const nextSong = await prisma.queueSong.findUnique({
+        where: { id: nextSongId },
+        select: { durationMs: true },
+      });
+
+      if (nextSong) {
+        scheduleAutoSkip(roomId, nextSong.durationMs);
+      }
+    }
+  },
+  {
+    connection: createBullMQConnection(),
+    concurrency: 5,
+  },
+);
+
+autoSkipWorker.on('failed', (job, err) => {
+  logger.error({ jobId: job?.id, err }, 'auto-skip job failed');
+});
+
+autoSkipWorker.on('error', (err) => {
+  logger.error({ err }, 'autoSkipWorker connection error');
+});
+
 /**
  * Gracefully closes all workers.
  * Call this in your server shutdown handler (SIGTERM / SIGINT).
  * Allows in-flight jobs to complete before the process exits.
  */
 export const closeWorkers = async (): Promise<void> => {
-  await seekSyncWorker.close();
+  await Promise.all([seekSyncWorker.close(), autoSkipWorker.close()]);
   logger.info('BullMQ workers closed');
 };

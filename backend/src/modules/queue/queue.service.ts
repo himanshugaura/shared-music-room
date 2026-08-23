@@ -7,7 +7,7 @@ import {
   patchPlayerState,
   seedPlayerState,
 } from '../../redis/player.js';
-import { seekSyncQueue } from '../../jobs/queues.js';
+import { seekSyncQueue, autoSkipQueue } from '../../jobs/queues.js';
 
 export type QueueSongWithUser = Prisma.QueueSongGetPayload<{
   include: { addedBy: { select: { username: true; name: true; avatarUrl: true } } };
@@ -443,3 +443,42 @@ export const voteOnTrack = async (
   });
 };
 
+
+/**
+ * Schedules a server-side auto-skip for a room.
+ *
+ * A fixed jobId (`auto-skip:{roomId}`) means there is ALWAYS at most one
+ * pending job per room. Calling this again replaces the previous job, which
+ * is exactly what we want when the admin seeks or a new song starts.
+ *
+ * @param roomId      The room to schedule for.
+ * @param remainingMs Milliseconds until the current song ends.
+ */
+export const scheduleAutoSkip = (roomId: string, remainingMs: number): void => {
+  // Add a small buffer (500 ms) so the job doesn't fire a hair too early
+  // due to clock drift between when we measured and when BullMQ fires.
+  const delay = Math.max(0, remainingMs) + 500;
+
+  autoSkipQueue.add(
+    'auto-skip',
+    { roomId },
+    {
+      jobId: `auto-skip:${roomId}`,
+      delay,
+      // If a job with this ID already exists (waiting/delayed), replace it.
+      // This means seek/play always gets a fresh countdown.
+    },
+  ).catch((err: unknown) => {
+    logger.warn({ roomId, err }, 'auto-skip: failed to enqueue job (non-critical)');
+  });
+};
+
+/**
+ * Cancels any pending auto-skip job for a room.
+ * Call this on pause, manual skip, or when the queue empties.
+ */
+export const cancelAutoSkip = (roomId: string): void => {
+  autoSkipQueue.remove(`auto-skip:${roomId}`).catch((err: unknown) => {
+    logger.warn({ roomId, err }, 'auto-skip: failed to cancel job (non-critical)');
+  });
+};

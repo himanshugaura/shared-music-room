@@ -6,9 +6,12 @@ import {
   setQueueSeek,
   advanceToNextSong,
   findSongWithQueue,
+  scheduleAutoSkip,
+  cancelAutoSkip,
 } from '../../modules/queue/queue.service.js';
 import { findRoomOwnerById } from '../../modules/room/room.service.js';
 import { patchPlayerState } from '../../redis/player.js';
+import { prisma } from '../../config/prisma.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type RoomPayload = { roomId: string };
@@ -42,6 +45,20 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
 
       socket.to(roomId).emit('player:play', { roomId, at: Date.now() });
       ack?.({ ok: true });
+
+      // Schedule server-side auto-skip so the song advances even if admin closes their tab.
+      // We read state fresh to get currentPositionMs and look up the song's durationMs.
+      const state = await findMusicQueueByRoomId(roomId);
+      if (state?.currentQueueSongId) {
+        const song = await prisma.queueSong.findUnique({
+          where: { id: state.currentQueueSongId },
+          select: { durationMs: true },
+        });
+        if (song) {
+          const remainingMs = song.durationMs - (state.currentPositionMs ?? 0);
+          scheduleAutoSkip(roomId, remainingMs);
+        }
+      }
     } catch {
       ack?.({ ok: false, message: 'Failed to play' });
     }
@@ -65,6 +82,9 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           ack?.({ ok: false, message: 'Queue not found' });
           return;
         }
+
+        // Cancel the auto-skip — the song isn't playing anymore
+        cancelAutoSkip(roomId);
 
         socket.to(roomId).emit('player:pause', { roomId, currentPositionMs });
         ack?.({ ok: true });
@@ -96,6 +116,18 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         const at = Date.now();
         socket.to(roomId).emit('player:seek', { roomId, positionMs, at });
         ack?.({ ok: true });
+
+        // Reschedule auto-skip with the new remaining time after the seek.
+        const state = await findMusicQueueByRoomId(roomId);
+        if (state?.currentQueueSongId) {
+          const song = await prisma.queueSong.findUnique({
+            where: { id: state.currentQueueSongId },
+            select: { durationMs: true },
+          });
+          if (song) {
+            scheduleAutoSkip(roomId, song.durationMs - positionMs);
+          }
+        }
       } catch {
         ack?.({ ok: false, message: 'Failed to seek' });
       }
@@ -121,7 +153,9 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           return;
         }
 
-   
+        // Cancel the pending auto-skip for the song being manually skipped
+        cancelAutoSkip(roomId);
+
         const updatedQueue = await advanceToNextSong(
           songWithQueue.queue.id,
           songWithQueue.position,
@@ -130,10 +164,6 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         const nextSongId = updatedQueue?.currentQueueSongId ?? null;
 
         // Sync Redis with the new Postgres state produced by advanceToNextSong.
-        // advanceToNextSong writes to Postgres directly (it's a transaction),
-        // so we must manually keep Redis in sync here.
-        // Fire-and-forget: the socket event is already correct — a Redis
-        // patch failure here is non-critical (next cache miss re-seeds from Postgres).
         if (updatedQueue) {
           patchPlayerState(roomId, {
             isPlaying: updatedQueue.isPlaying,
@@ -145,6 +175,17 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
 
         io.to(roomId).emit('player:skip', { roomId, nextSongId, at: Date.now() });
         ack?.({ ok: true, data: { nextSongId } });
+
+        // Schedule auto-skip for the next song so it advances even without the admin's browser
+        if (nextSongId) {
+          const nextSong = await prisma.queueSong.findUnique({
+            where: { id: nextSongId },
+            select: { durationMs: true },
+          });
+          if (nextSong) {
+            scheduleAutoSkip(roomId, nextSong.durationMs);
+          }
+        }
       } catch {
         ack?.({ ok: false, message: 'Failed to skip' });
       }

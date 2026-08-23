@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io';
-import { type QueueSongWithUser, addTrackToQueue } from '../../modules/queue/queue.service.js';
+import { type QueueSongWithUser, addTrackToQueue, scheduleAutoSkip } from '../../modules/queue/queue.service.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type TrackPayload = {
@@ -29,6 +29,8 @@ export const registerQueueHandlers = (io: Server, socket: AuthenticatedSocket): 
         // First song added — tell all clients to start playing
         if (autoStarted) {
           io.to(roomId).emit('player:play', { roomId, at: Date.now() });
+          // Schedule server-side auto-skip for the full duration of the first song
+          scheduleAutoSkip(roomId, song.durationMs);
         }
 
         ack?.({ ok: true, data: song });
