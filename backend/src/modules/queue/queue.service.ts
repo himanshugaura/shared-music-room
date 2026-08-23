@@ -200,8 +200,16 @@ export const syncQueueTimeline = async (roomId: string): Promise<MusicQueue | nu
   });
   if (!currentSongCheck) return null;
 
+  // TWEAK 1 (Grace Period): Allow skip if within 2 seconds of the end.
+  // YouTube often fires 'onEnded' slightly early. This prevents the frontend
+  // from getting locked out by its 5-second spam filter.
+  const GRACE_PERIOD_MS = 2000;
+  // TWEAK 2 (Clean Start): If we overflow into the next song by less than this,
+  // snap to 0:00 so the next song starts cleanly for active listeners.
+  const CLEAN_START_THRESHOLD_MS = 10000;
+
   const elapsedMs = Date.now() - state.playbackStartedAt.getTime() + state.currentPositionMs;
-  if (elapsedMs < currentSongCheck.durationMs) return null; // Song is still mid-play
+  if (elapsedMs < currentSongCheck.durationMs - GRACE_PERIOD_MS) return null; // Song is still mid-play
 
   // Song should have ended — run the full fast-forward inside a transaction
   return prisma.$transaction(async (tx) => {
@@ -223,7 +231,7 @@ export const syncQueueTimeline = async (roomId: string): Promise<MusicQueue | nu
 
     const txElapsedMs = Date.now() - latestRedisState.playbackStartedAt.getTime() + latestRedisState.currentPositionMs;
     const txCurrentSong = queue.songs.find((s) => s.id === latestRedisState.currentQueueSongId);
-    if (!txCurrentSong || txElapsedMs < txCurrentSong.durationMs) return null;
+    if (!txCurrentSong || txElapsedMs < txCurrentSong.durationMs - GRACE_PERIOD_MS) return null;
 
     // Sort the same way advanceToNextSong would
     const sorted = [...queue.songs].sort((a, b) => {
@@ -239,7 +247,7 @@ export const syncQueueTimeline = async (roomId: string): Promise<MusicQueue | nu
     const songsToDelete: string[] = [];
 
     for (const song of sorted) {
-      if (remainingMs < song.durationMs) {
+      if (remainingMs < song.durationMs - GRACE_PERIOD_MS) {
         // We're somewhere inside this song
         targetSongId = song.id;
         break;
@@ -252,6 +260,11 @@ export const syncQueueTimeline = async (roomId: string): Promise<MusicQueue | nu
     if (songsToDelete.length === 0) return null; // Should never happen given our pre-check
 
     await tx.queueSong.deleteMany({ where: { id: { in: songsToDelete } } });
+
+    // Apply Tweak 2 (Clean Start)
+    if (targetSongId && remainingMs < CLEAN_START_THRESHOLD_MS) {
+      remainingMs = 0; // Snap to exactly 0:00
+    }
 
     const newStartedAt = targetSongId ? new Date(Date.now() - remainingMs) : null;
 
