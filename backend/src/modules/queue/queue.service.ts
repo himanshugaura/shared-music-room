@@ -212,9 +212,17 @@ export const syncQueueTimeline = async (roomId: string): Promise<MusicQueue | nu
 
     if (!queue || !queue.isPlaying || !queue.playbackStartedAt) return null;
 
-    // Re-check inside the transaction (another request may have already advanced it)
-    const txElapsedMs = Date.now() - queue.playbackStartedAt.getTime() + queue.currentPositionMs;
-    const txCurrentSong = queue.songs.find((s) => s.id === queue.currentQueueSongId);
+    // Re-check inside the transaction using Redis (always up-to-date) rather than
+    // Postgres (which lags up to 2 sec after a seek due to the BullMQ debounce).
+    // We already have the Redis state from the pre-check above — just re-read it
+    // here in case another concurrent request already advanced the queue.
+    const latestRedisState = await getPlayerState(roomId);
+    if (!latestRedisState || !latestRedisState.isPlaying || !latestRedisState.playbackStartedAt) {
+      return null; // Another request already advanced or paused
+    }
+
+    const txElapsedMs = Date.now() - latestRedisState.playbackStartedAt.getTime() + latestRedisState.currentPositionMs;
+    const txCurrentSong = queue.songs.find((s) => s.id === latestRedisState.currentQueueSongId);
     if (!txCurrentSong || txElapsedMs < txCurrentSong.durationMs) return null;
 
     // Sort the same way advanceToNextSong would
