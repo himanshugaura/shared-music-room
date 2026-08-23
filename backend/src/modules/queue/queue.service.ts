@@ -180,84 +180,72 @@ export const setQueueSeek = async (roomId: string, positionMs: number): Promise<
  * "Lazy Evaluation" Timeline Fast-Forward
  *
  * If the queue was left playing without anyone advancing it, this calculates
- * exactly how much time elapsed and skips forward through the playlist
- * until it lands precisely at the currently playing song and second.
+ * exactly how much time elapsed, skips the songs that would have finished,
+ * and lands precisely at the currently-playing song and position.
+ *
+ * @returns The updated MusicQueue if the queue actually advanced, null if
+ *          the current song is still playing and nothing needed to change.
  */
-export const syncQueueTimeline = async (roomId: string): Promise<void> => {
+export const syncQueueTimeline = async (roomId: string): Promise<MusicQueue | null> => {
   const state = await getPlayerState(roomId);
   if (!state || !state.isPlaying || !state.playbackStartedAt || !state.currentQueueSongId) {
-    return; // Paused or nothing loaded — nothing to sync
+    return null; // Paused or nothing loaded — nothing to sync
   }
 
-  // Quick pre-check: if we haven't exceeded the current song duration yet, skip the Postgres work.
-  // We look up the current song's duration separately to avoid a heavy query on every tick.
-  const currentSong = await prisma.queueSong.findUnique({
+  // Quick pre-check: has the current song's time been exceeded?
+  // Avoids the expensive Postgres transaction on every normal tick.
+  const currentSongCheck = await prisma.queueSong.findUnique({
     where: { id: state.currentQueueSongId },
     select: { durationMs: true },
   });
+  if (!currentSongCheck) return null;
 
   const elapsedMs = Date.now() - state.playbackStartedAt.getTime() + state.currentPositionMs;
-  if (!currentSong || elapsedMs < currentSong.durationMs) return; // Still playing fine
+  if (elapsedMs < currentSongCheck.durationMs) return null; // Song is still mid-play
 
-  await prisma.$transaction(async (tx) => {
-    // We need all songs to simulate skipping.
-    // Prisma can't dynamically sort nested relations easily, so we fetch all and sort in memory.
+  // Song should have ended — run the full fast-forward inside a transaction
+  return prisma.$transaction(async (tx) => {
     const queue = await tx.musicQueue.findUnique({
       where: { roomId },
-      include: { songs: true }
+      include: { songs: true },
     });
 
-    if (!queue || !queue.isPlaying || !queue.playbackStartedAt) return;
+    if (!queue || !queue.isPlaying || !queue.playbackStartedAt) return null;
 
-    // Sort exactly as advanceToNextSong would
-    queue.songs.sort((a, b) => {
-      if (queue.shuffleEnabled) {
-        if (b.voteScore !== a.voteScore) return b.voteScore - a.voteScore;
+    // Re-check inside the transaction (another request may have already advanced it)
+    const txElapsedMs = Date.now() - queue.playbackStartedAt.getTime() + queue.currentPositionMs;
+    const txCurrentSong = queue.songs.find((s) => s.id === queue.currentQueueSongId);
+    if (!txCurrentSong || txElapsedMs < txCurrentSong.durationMs) return null;
+
+    // Sort the same way advanceToNextSong would
+    const sorted = [...queue.songs].sort((a, b) => {
+      if (queue.shuffleEnabled && b.voteScore !== a.voteScore) {
+        return b.voteScore - a.voteScore;
       }
       return a.position - b.position;
     });
 
-    // Fast-forward loop
-    let remainingVirtualMs = Date.now() - queue.playbackStartedAt.getTime() + queue.currentPositionMs;
-    let targetSongId = queue.currentQueueSongId;
-    
-    // Find where the current song is in the array
-    const currentIndex = queue.songs.findIndex((s) => s.id === targetSongId);
-    if (currentIndex === -1) return;
-
-    let idx = currentIndex;
+    // Fast-forward: consume time song-by-song until we land in the right one
+    let remainingMs = txElapsedMs;
+    let targetSongId: string | null = null;
     const songsToDelete: string[] = [];
-    
-    while (idx < queue.songs.length) {
-      const song = queue.songs[idx];
-      if (!song) break;
-      
-      if (remainingVirtualMs < song.durationMs) {
-        // We landed in this song!
+
+    for (const song of sorted) {
+      if (remainingMs < song.durationMs) {
+        // We're somewhere inside this song
         targetSongId = song.id;
         break;
       }
-      
-      // We skip past this song
-      remainingVirtualMs -= song.durationMs;
+      remainingMs -= song.durationMs;
       songsToDelete.push(song.id);
-      idx++;
-      targetSongId = null; // In case we run out of songs
     }
 
-    if (songsToDelete.length === 0) return; // Haven't skipped anything yet
+    // songsToDelete always has at least the old current song (its time was exceeded)
+    if (songsToDelete.length === 0) return null; // Should never happen given our pre-check
 
-    // Execute the deletions and update
-    if (songsToDelete.length > 0) {
-      await tx.queueSong.deleteMany({
-        where: { id: { in: songsToDelete } }
-      });
-    }
+    await tx.queueSong.deleteMany({ where: { id: { in: songsToDelete } } });
 
-    let newStartedAt: Date | null = null;
-    if (targetSongId) {
-      newStartedAt = new Date(Date.now() - remainingVirtualMs);
-    }
+    const newStartedAt = targetSongId ? new Date(Date.now() - remainingMs) : null;
 
     const updatedQueue = await tx.musicQueue.update({
       where: { id: queue.id },
@@ -269,13 +257,15 @@ export const syncQueueTimeline = async (roomId: string): Promise<void> => {
       },
     });
 
-    // Write directly to Redis cache
+    // Mirror the change to Redis immediately so subsequent reads are consistent
     patchPlayerState(roomId, {
       isPlaying: updatedQueue.isPlaying,
-      currentPositionMs: updatedQueue.currentPositionMs,
+      currentPositionMs: 0,
       playbackStartedAt: updatedQueue.playbackStartedAt,
       currentQueueSongId: updatedQueue.currentQueueSongId,
     }).catch(() => {});
+
+    return updatedQueue;
   });
 };
 
