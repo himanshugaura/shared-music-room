@@ -27,6 +27,8 @@ export interface RoomSocketCallbacks {
   onSeek?: (positionMs: number) => void;
   /** nextSongId is null when queue is exhausted */
   onSkip?: (nextSongId: string | null, serverAt: number) => void;
+  /** Fired when the server fast-forwarded the queue — may have skipped multiple songs */
+  onSync?: (currentQueueSongId: string | null, positionMs: number, playbackStartedAt: string | null, serverAt: number) => void;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -145,14 +147,19 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       };
 
       const onSync = (payload: { roomId: string; isPlaying: boolean; currentQueueSongId: string | null; currentPositionMs: number; playbackStartedAt: string | null; at: number }) => {
+        // Update cache: remove all songs that were skipped (everything before the new current song).
+        // syncQueueTimeline already deleted them from Postgres, so we mirror that here.
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
           
-          // If song changed, remove the old one(s) conceptually or just let a full refresh happen?
-          // Since syncQueueTimeline might have skipped multiple songs, the safest thing is to refetch
-          // OR we can manually delete all songs before the new one.
-          const currentIndex = prev.songs.findIndex((s) => s.id === payload.currentQueueSongId);
-          const remainingSongs = currentIndex >= 0 ? prev.songs.slice(currentIndex) : [];
+          if (!payload.currentQueueSongId) {
+            // Queue exhausted
+            return { ...prev, isPlaying: false, currentQueueSongId: null, songs: [], currentPositionMs: 0, playbackStartedAt: null };
+          }
+
+          const newIdx = prev.songs.findIndex((s) => s.id === payload.currentQueueSongId);
+          // Slice: keep from the new current song onward (the server already deleted the ones before it)
+          const remainingSongs = newIdx >= 0 ? prev.songs.slice(newIdx) : prev.songs;
           
           return {
             ...prev,
@@ -164,12 +171,8 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
           };
         });
 
-        // Trigger onSkip callback (which loads the new video) if the song ID changed
-        if (payload.currentQueueSongId) {
-          cbRef.current.onSkip?.(payload.currentQueueSongId, payload.at);
-        } else {
-          cbRef.current.onSkip?.(null, payload.at);
-        }
+        // Delegate the actual video load to RoomPage via the onSync callback
+        cbRef.current.onSync?.(payload.currentQueueSongId, payload.currentPositionMs, payload.playbackStartedAt, payload.at);
       };
 
       socket.on("player:play", onPlay);

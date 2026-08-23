@@ -122,12 +122,36 @@ export function RoomPage({ roomId }: { roomId: string }) {
     [qc, roomId]  // ← no longer depends on stale `queue`
   );
 
+  const handleSocketSync = useCallback(
+    (currentQueueSongId: string | null, positionMs: number, playbackStartedAt: string | null, serverAt: number) => {
+      if (!currentQueueSongId) {
+        // Queue ran out
+        controlRef.current?.pause();
+        return;
+      }
+      // Read from the freshly-updated cache (setQueryData in onSync is synchronous)
+      const fresh = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
+      const song = fresh?.songs.find((s) => s.id === currentQueueSongId);
+      if (!song) return;
+
+      // Compute how far into the song we are right now:
+      // The server set playbackStartedAt = Date.now() - remainingVirtualMs,
+      // so elapsed = Date.now() - playbackStartedAt = remainingVirtualMs + network lag.
+      const elapsed = playbackStartedAt
+        ? Math.max(0, (Date.now() - new Date(playbackStartedAt).getTime()) / 1000)
+        : positionMs / 1000;
+      controlRef.current?.loadVideo(song.youtubeVideoId, elapsed, true);
+    },
+    [qc, roomId]
+  );
+
   // Socket wiring
   const { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync } = useRoomSocket(roomId, {
     onPlay: handleSocketPlay,
     onPause: handleSocketPause,
     onSeek: handleSocketSeek,
     onSkip: handleSocketSkip,
+    onSync: handleSocketSync,
   });
 
   // Guard: prevents double-emit if the YouTube ENDED event fires more than once

@@ -186,11 +186,18 @@ export const setQueueSeek = async (roomId: string, positionMs: number): Promise<
 export const syncQueueTimeline = async (roomId: string): Promise<void> => {
   const state = await getPlayerState(roomId);
   if (!state || !state.isPlaying || !state.playbackStartedAt || !state.currentQueueSongId) {
-    return; // Nothing to sync
+    return; // Paused or nothing loaded — nothing to sync
   }
 
+  // Quick pre-check: if we haven't exceeded the current song duration yet, skip the Postgres work.
+  // We look up the current song's duration separately to avoid a heavy query on every tick.
+  const currentSong = await prisma.queueSong.findUnique({
+    where: { id: state.currentQueueSongId },
+    select: { durationMs: true },
+  });
+
   const elapsedMs = Date.now() - state.playbackStartedAt.getTime() + state.currentPositionMs;
-  if (elapsedMs <= 0) return;
+  if (!currentSong || elapsedMs < currentSong.durationMs) return; // Still playing fine
 
   await prisma.$transaction(async (tx) => {
     // We need all songs to simulate skipping.
