@@ -64,14 +64,29 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
 
       // ── Player event listeners ─────────────────────────────────────────────
 
-      const onPlay = ({ at }: { at: number }) =>
+      const onPlay = ({ at }: { at: number }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+          return { ...prev, isPlaying: true, playbackStartedAt: new Date(at) };
+        });
         cbRef.current.onPlay?.(at);
+      };
 
-      const onPause = ({ currentPositionMs }: { currentPositionMs: number }) =>
+      const onPause = ({ currentPositionMs }: { currentPositionMs: number }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+          return { ...prev, isPlaying: false, currentPositionMs };
+        });
         cbRef.current.onPause?.(currentPositionMs);
+      };
 
-      const onSeek = ({ positionMs }: { positionMs: number }) =>
+      const onSeek = ({ positionMs, at }: { positionMs: number; at: number }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+          return { ...prev, currentPositionMs: positionMs, playbackStartedAt: new Date(at) };
+        });
         cbRef.current.onSeek?.(positionMs);
+      };
 
       const onSkip = ({
         nextSongId,

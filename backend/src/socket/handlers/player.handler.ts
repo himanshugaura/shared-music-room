@@ -90,7 +90,8 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           return;
         }
 
-        socket.to(roomId).emit('player:seek', { roomId, positionMs });
+        const at = Date.now();
+        socket.to(roomId).emit('player:seek', { roomId, positionMs, at });
         ack?.({ ok: true });
       } catch {
         ack?.({ ok: false, message: 'Failed to seek' });

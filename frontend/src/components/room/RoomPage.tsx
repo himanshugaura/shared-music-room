@@ -137,19 +137,31 @@ export function RoomPage({ roomId }: { roomId: string }) {
   // ── Owner control handlers (emit + local player) ──────────────────────────
 
   const handlePlay = useCallback(() => {
-    emitPlay();
     controlRef.current?.play();
-  }, [emitPlay]);
+    qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+      if (!prev) return prev;
+      return { ...prev, isPlaying: true, playbackStartedAt: new Date() };
+    });
+    emitPlay();
+  }, [emitPlay, qc, roomId]);
 
   const handlePause = useCallback((positionMs: number) => {
     controlRef.current?.pause();
+    qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+      if (!prev) return prev;
+      return { ...prev, isPlaying: false, currentPositionMs: positionMs };
+    });
     emitPause(positionMs);
-  }, [emitPause]);
+  }, [emitPause, qc, roomId]);
 
   const handleSeek = useCallback((positionMs: number) => {
     controlRef.current?.seekTo(positionMs / 1000);
+    qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+      if (!prev) return prev;
+      return { ...prev, currentPositionMs: positionMs, playbackStartedAt: new Date() };
+    });
     emitSeek(positionMs);
-  }, [emitSeek]);
+  }, [emitSeek, qc, roomId]);
 
   const handleSkip = useCallback(() => {
     if (!currentSong) return;
