@@ -5,7 +5,10 @@ import {
   setQueueSeek,
   advanceToNextSong,
   findSongWithQueue,
+  syncQueueTimeline,
+  findMusicQueueByRoomId,
 } from '../../modules/queue/queue.service.js';
+import { logger } from '../../utils/logger.js';
 import { findRoomOwnerById } from '../../modules/room/room.service.js';
 import { patchPlayerState } from '../../redis/player.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
@@ -143,5 +146,32 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         ack?.({ ok: false, message: 'Failed to skip' });
       }
     },
+  );
+
+  socket.on(
+    'player:request_sync',
+    async ({ roomId }: RoomPayload) => {
+      try {
+        // Run the fast-forward algorithm
+        await syncQueueTimeline(roomId);
+
+        // Fetch the newly settled state
+        const state = await findMusicQueueByRoomId(roomId);
+        if (state) {
+          // Tell everyone in the room what the newly synced state is.
+          // This acts exactly like a skip event, but updates all timestamps.
+          io.to(roomId).emit('player:sync', { 
+            roomId, 
+            isPlaying: state.isPlaying,
+            currentQueueSongId: state.currentQueueSongId,
+            currentPositionMs: state.currentPositionMs,
+            playbackStartedAt: state.playbackStartedAt?.toISOString() || null,
+            at: Date.now()
+          });
+        }
+      } catch (err) {
+        logger.error({ err, roomId }, 'Failed to process sync request');
+      }
+    }
   );
 };

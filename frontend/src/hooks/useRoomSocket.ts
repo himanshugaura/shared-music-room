@@ -144,10 +144,39 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         });
       };
 
+      const onSync = (payload: { roomId: string; isPlaying: boolean; currentQueueSongId: string | null; currentPositionMs: number; playbackStartedAt: string | null; at: number }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+          
+          // If song changed, remove the old one(s) conceptually or just let a full refresh happen?
+          // Since syncQueueTimeline might have skipped multiple songs, the safest thing is to refetch
+          // OR we can manually delete all songs before the new one.
+          const currentIndex = prev.songs.findIndex((s) => s.id === payload.currentQueueSongId);
+          const remainingSongs = currentIndex >= 0 ? prev.songs.slice(currentIndex) : [];
+          
+          return {
+            ...prev,
+            isPlaying: payload.isPlaying,
+            currentQueueSongId: payload.currentQueueSongId,
+            currentPositionMs: payload.currentPositionMs,
+            playbackStartedAt: payload.playbackStartedAt,
+            songs: remainingSongs,
+          };
+        });
+
+        // Trigger onSkip callback (which loads the new video) if the song ID changed
+        if (payload.currentQueueSongId) {
+          cbRef.current.onSkip?.(payload.currentQueueSongId, payload.at);
+        } else {
+          cbRef.current.onSkip?.(null, payload.at);
+        }
+      };
+
       socket.on("player:play", onPlay);
       socket.on("player:pause", onPause);
       socket.on("player:seek", onSeek);
       socket.on("player:skip", onSkip);
+      socket.on("player:sync", onSync);
       socket.on("queue:song_added", onSongAdded);
       socket.on("queue:song_voted", onSongVoted);
       socket.on("queueUpdated", onQueueUpdated);
@@ -161,6 +190,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         socket.off("player:pause", onPause);
         socket.off("player:seek", onSeek);
         socket.off("player:skip", onSkip);
+        socket.off("player:sync", onSync);
         socket.off("queue:song_added", onSongAdded);
         socket.off("queue:song_voted", onSongVoted);
         socket.off("queueUpdated", onQueueUpdated);
@@ -189,5 +219,9 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
     socketRef.current?.emit("player:skip", { roomId, currentSongId });
   }, [roomId]);
 
-  return { emitPlay, emitPause, emitSeek, emitSkip };
+  const emitRequestSync = useCallback(() => {
+    socketRef.current?.emit("player:request_sync", { roomId });
+  }, [roomId]);
+
+  return { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync };
 }

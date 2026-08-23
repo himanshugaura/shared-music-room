@@ -27,6 +27,10 @@ const includeAddedBy = {
 export const findMusicQueueByRoomId = async (
   roomId: string
 ): Promise<Omit<MusicQueue, 'createdAt' | 'updatedAt'> | null> => {
+  // 1. First, lazily fast-forward the timeline if it's been playing in the void
+  await syncQueueTimeline(roomId);
+
+  // 2. Fetch the newly synced state from Redis
   const cached = await getPlayerState(roomId);
 
   if (cached) {
@@ -170,6 +174,102 @@ export const setQueueSeek = async (roomId: string, positionMs: number): Promise<
   });
 
   return true;
+};
+
+/**
+ * "Lazy Evaluation" Timeline Fast-Forward
+ *
+ * If the queue was left playing without anyone advancing it, this calculates
+ * exactly how much time elapsed and skips forward through the playlist
+ * until it lands precisely at the currently playing song and second.
+ */
+export const syncQueueTimeline = async (roomId: string): Promise<void> => {
+  const state = await getPlayerState(roomId);
+  if (!state || !state.isPlaying || !state.playbackStartedAt || !state.currentQueueSongId) {
+    return; // Nothing to sync
+  }
+
+  const elapsedMs = Date.now() - state.playbackStartedAt.getTime() + state.currentPositionMs;
+  if (elapsedMs <= 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    // We need all songs to simulate skipping.
+    // Prisma can't dynamically sort nested relations easily, so we fetch all and sort in memory.
+    const queue = await tx.musicQueue.findUnique({
+      where: { roomId },
+      include: { songs: true }
+    });
+
+    if (!queue || !queue.isPlaying || !queue.playbackStartedAt) return;
+
+    // Sort exactly as advanceToNextSong would
+    queue.songs.sort((a, b) => {
+      if (queue.shuffleEnabled) {
+        if (b.voteScore !== a.voteScore) return b.voteScore - a.voteScore;
+      }
+      return a.position - b.position;
+    });
+
+    // Fast-forward loop
+    let remainingVirtualMs = Date.now() - queue.playbackStartedAt.getTime() + queue.currentPositionMs;
+    let targetSongId = queue.currentQueueSongId;
+    
+    // Find where the current song is in the array
+    const currentIndex = queue.songs.findIndex((s) => s.id === targetSongId);
+    if (currentIndex === -1) return;
+
+    let idx = currentIndex;
+    const songsToDelete: string[] = [];
+    
+    while (idx < queue.songs.length) {
+      const song = queue.songs[idx];
+      if (!song) break;
+      
+      if (remainingVirtualMs < song.durationMs) {
+        // We landed in this song!
+        targetSongId = song.id;
+        break;
+      }
+      
+      // We skip past this song
+      remainingVirtualMs -= song.durationMs;
+      songsToDelete.push(song.id);
+      idx++;
+      targetSongId = null; // In case we run out of songs
+    }
+
+    if (songsToDelete.length === 0) return; // Haven't skipped anything yet
+
+    // Execute the deletions and update
+    if (songsToDelete.length > 0) {
+      await tx.queueSong.deleteMany({
+        where: { id: { in: songsToDelete } }
+      });
+    }
+
+    let newStartedAt: Date | null = null;
+    if (targetSongId) {
+      newStartedAt = new Date(Date.now() - remainingVirtualMs);
+    }
+
+    const updatedQueue = await tx.musicQueue.update({
+      where: { id: queue.id },
+      data: {
+        currentQueueSongId: targetSongId,
+        isPlaying: !!targetSongId,
+        currentPositionMs: 0,
+        playbackStartedAt: newStartedAt,
+      },
+    });
+
+    // Write directly to Redis cache
+    patchPlayerState(roomId, {
+      isPlaying: updatedQueue.isPlaying,
+      currentPositionMs: updatedQueue.currentPositionMs,
+      playbackStartedAt: updatedQueue.playbackStartedAt,
+      currentQueueSongId: updatedQueue.currentQueueSongId,
+    }).catch(() => {});
+  });
 };
 
 export const advanceToNextSong = async (

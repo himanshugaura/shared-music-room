@@ -123,7 +123,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
   );
 
   // Socket wiring
-  const { emitPlay, emitPause, emitSeek, emitSkip } = useRoomSocket(roomId, {
+  const { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync } = useRoomSocket(roomId, {
     onPlay: handleSocketPlay,
     onPause: handleSocketPause,
     onSeek: handleSocketSeek,
@@ -133,6 +133,32 @@ export function RoomPage({ roomId }: { roomId: string }) {
   // Guard: prevents double-emit if the YouTube ENDED event fires more than once
   // (can happen due to YT API buffering quirks or rapid seek-to-end).
   const skipInProgressRef = useRef(false);
+
+  // ── Distributed Client-Driven Auto-Skip Ticker ───────────────────────────
+  // Every client checks if the current song is past its duration.
+  // The first one to notice asks the server to sync the timeline.
+  // The server verifies the math strictly, so this is perfectly safe and robust.
+  useEffect(() => {
+    if (!queue || !queue.isPlaying || !currentSong) return;
+
+    const interval = setInterval(() => {
+      if (skipInProgressRef.current) return;
+
+      const elapsedMs = queue.playbackStartedAt
+        ? Date.now() - new Date(queue.playbackStartedAt).getTime()
+        : 0;
+      const currentPositionMs = queue.currentPositionMs + elapsedMs;
+
+      // Give a tiny 1-second buffer past the absolute end of the song
+      if (currentPositionMs > currentSong.durationMs + 1000) {
+        skipInProgressRef.current = true;
+        emitRequestSync();
+        setTimeout(() => { skipInProgressRef.current = false; }, 5000);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [queue, currentSong, emitRequestSync]);
 
   // ── Owner control handlers (emit + local player) ──────────────────────────
 
@@ -169,13 +195,14 @@ export function RoomPage({ roomId }: { roomId: string }) {
   }, [currentSong, emitSkip]);
 
   const handleEnded = useCallback(() => {
-    if (isOwner && currentSong && !skipInProgressRef.current) {
+    if (currentSong && !skipInProgressRef.current) {
       skipInProgressRef.current = true;
-      emitSkip(currentSong.id);
-      // Reset after 5s — covers the full round-trip (skip → server → broadcast → next song loads)
+      // Tell the server the song ended. Server will verify the timeline
+      // and broadcast the next song to everyone.
+      emitRequestSync();
       setTimeout(() => { skipInProgressRef.current = false; }, 5_000);
     }
-  }, [isOwner, currentSong, emitSkip]);
+  }, [currentSong, emitRequestSync]);
 
   // ── Render states ────────────────────────────────────────────────────────
 
