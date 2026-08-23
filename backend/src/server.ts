@@ -18,6 +18,7 @@ import { initializeSocket } from './socket/index.js';
 import { errorHandler } from './utils/errorHandler.js';
 import { logger } from './utils/logger.js';
 import { connectRedis } from './config/redis.js';
+import { closeWorkers } from './jobs/workers.js';
 
 dns.setDefaultResultOrder('ipv4first');
 
@@ -65,7 +66,9 @@ const startServer = async (): Promise<void> => {
 
   const shutdown = async (signal: string) => {
     logger.warn(`${signal} received — shutting down gracefully`);
-    
+
+    await closeWorkers();
+
     httpServer.close(async () => {
       logger.info('HTTP server closed');
       await prisma.$disconnect();

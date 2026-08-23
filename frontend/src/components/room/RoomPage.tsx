@@ -98,16 +98,19 @@ export function RoomPage({ roomId }: { roomId: string }) {
 
   const handleSocketSkip = useCallback(
     (nextSongId: string | null, serverAt: number) => {
-      // Update queue cache so the UI reflects the new current song
+      // Update queue cache — remove the song that just ended and advance currentQueueSongId.
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
         if (!prev) return prev;
         const currentSongId = prev.currentQueueSongId;
         const remainingSongs = prev.songs.filter(s => s.id !== currentSongId);
-        return { ...prev, currentQueueSongId: nextSongId, songs: remainingSongs, isPlaying: nextSongId ? true : false };
+        return { ...prev, currentQueueSongId: nextSongId, songs: remainingSongs, isPlaying: !!nextSongId };
       });
 
       if (nextSongId) {
-        const song = queue?.songs.find((s) => s.id === nextSongId);
+        // Read from the freshly updated cache — NOT from the stale `queue` closure.
+        // qc.setQueryData is synchronous, so this immediately returns the new state.
+        const fresh = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
+        const song = fresh?.songs.find((s) => s.id === nextSongId);
         if (song) {
           const lag = Math.max(0, (Date.now() - serverAt) / 1000);
           controlRef.current?.loadVideo(song.youtubeVideoId, lag);
@@ -116,7 +119,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
         controlRef.current?.pause();
       }
     },
-    [queue, qc, roomId]
+    [qc, roomId]  // ← no longer depends on stale `queue`
   );
 
   // Socket wiring
@@ -127,12 +130,14 @@ export function RoomPage({ roomId }: { roomId: string }) {
     onSkip: handleSocketSkip,
   });
 
+  // Guard: prevents double-emit if the YouTube ENDED event fires more than once
+  // (can happen due to YT API buffering quirks or rapid seek-to-end).
+  const skipInProgressRef = useRef(false);
+
   // ── Owner control handlers (emit + local player) ──────────────────────────
 
   const handlePlay = useCallback(() => {
     emitPlay();
-    // Note: local player.playVideo() is called by socket's own echo handler
-    // but we optimistically play locally here for the owner
     controlRef.current?.play();
   }, [emitPlay]);
 
@@ -152,8 +157,11 @@ export function RoomPage({ roomId }: { roomId: string }) {
   }, [currentSong, emitSkip]);
 
   const handleEnded = useCallback(() => {
-    if (isOwner && currentSong) {
+    if (isOwner && currentSong && !skipInProgressRef.current) {
+      skipInProgressRef.current = true;
       emitSkip(currentSong.id);
+      // Reset after 5s — covers the full round-trip (skip → server → broadcast → next song loads)
+      setTimeout(() => { skipInProgressRef.current = false; }, 5_000);
     }
   }, [isOwner, currentSong, emitSkip]);
 

@@ -22,9 +22,14 @@ export const registerQueueHandlers = (io: Server, socket: AuthenticatedSocket): 
       ack?: (res: AckResponse<QueueSongWithUser>) => void,
     ) => {
       try {
-        const song = await addTrackToQueue(roomId, socket.user.id, track);
+        const { song, autoStarted } = await addTrackToQueue(roomId, socket.user.id, track);
 
         io.to(roomId).emit('queue:song_added', { roomId, song });
+
+        // First song added — tell all clients to start playing
+        if (autoStarted) {
+          io.to(roomId).emit('player:play', { roomId, at: Date.now() });
+        }
 
         ack?.({ ok: true, data: song });
       } catch (err) {

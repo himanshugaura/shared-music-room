@@ -7,6 +7,7 @@ import { registerRoomHandlers } from './handlers/room.handler.js';
 import type { AuthenticatedSocket } from './types.js';
 
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 let io: Server | null = null;
 
 export const initializeSocket = (httpServer: HTTPServer): Server => {
@@ -24,10 +25,21 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
 
   io.on('connection', (socket) => {
     const authedSocket = socket as AuthenticatedSocket;
+    const userId = authedSocket.user?.id;
+
+    logger.info({ socketId: socket.id, userId }, 'Socket connected');
 
     registerRoomHandlers(io!, authedSocket);
     registerQueueHandlers(io!, authedSocket);
     registerPlayerHandlers(io!, authedSocket);
+
+    socket.on('disconnect', (reason) => {
+      logger.info({ socketId: socket.id, userId, reason }, 'Socket disconnected');
+    });
+
+    socket.on('error', (err) => {
+      logger.error({ err, socketId: socket.id, userId }, 'Socket error');
+    });
   });
 
   return io;
