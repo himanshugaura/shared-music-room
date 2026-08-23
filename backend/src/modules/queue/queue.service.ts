@@ -7,7 +7,7 @@ import {
   patchPlayerState,
   seedPlayerState,
 } from '../../redis/player.js';
-import { seekSyncQueue, autoSkipQueue } from '../../jobs/queues.js';
+import { seekSyncQueue } from '../../jobs/queues.js';
 
 export type QueueSongWithUser = Prisma.QueueSongGetPayload<{
   include: { addedBy: { select: { username: true; name: true; avatarUrl: true } } };
@@ -441,54 +441,4 @@ export const voteOnTrack = async (
       include: includeAddedBy,
     });
   });
-};
-
-
-/**
- * Schedules a server-side auto-skip for a room.
- *
- * Always removes any existing job first — BullMQ does NOT replace delayed
- * jobs with the same jobId; it throws. We must explicitly remove-then-add
- * to guarantee the countdown always reflects the latest position.
- *
- * @param roomId      The room to schedule for.
- * @param remainingMs Milliseconds until the current song ends.
- */
-export const scheduleAutoSkip = async (roomId: string, remainingMs: number): Promise<void> => {
-  const jobId = `auto-skip:${roomId}`;
-
-  try {
-    // Remove any existing delayed job for this room before adding a new one.
-    // This is required because BullMQ throws if you add a duplicate jobId.
-    const existing = await autoSkipQueue.getJob(jobId);
-    if (existing) {
-      await existing.remove();
-    }
-
-    // Add a small buffer (500 ms) to account for clock drift.
-    const delay = Math.max(0, remainingMs) + 500;
-
-    await autoSkipQueue.add('auto-skip', { roomId }, { jobId, delay });
-    logger.debug({ roomId, remainingMs, delay }, 'auto-skip: job scheduled');
-  } catch (err: unknown) {
-    logger.warn({ roomId, err }, 'auto-skip: failed to schedule job (non-critical)');
-  }
-};
-
-/**
- * Cancels any pending auto-skip job for a room.
- * Call this on pause or when the queue empties.
- * Manual skip calls this then schedules for the next song immediately.
- */
-export const cancelAutoSkip = async (roomId: string): Promise<void> => {
-  try {
-    const jobId = `auto-skip:${roomId}`;
-    const existing = await autoSkipQueue.getJob(jobId);
-    if (existing) {
-      await existing.remove();
-      logger.debug({ roomId }, 'auto-skip: job cancelled');
-    }
-  } catch (err: unknown) {
-    logger.warn({ roomId, err }, 'auto-skip: failed to cancel job (non-critical)');
-  }
 };

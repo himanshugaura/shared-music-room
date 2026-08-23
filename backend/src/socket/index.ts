@@ -6,7 +6,7 @@ import { registerQueueHandlers } from './handlers/queue.handler.js';
 import { registerRoomHandlers } from './handlers/room.handler.js';
 import type { AuthenticatedSocket } from './types.js';
 import { prisma } from '../config/prisma.js';
-import { setQueuePaused, cancelAutoSkip } from '../modules/queue/queue.service.js';
+import { setQueuePaused } from '../modules/queue/queue.service.js';
 import { getPlayerState } from '../redis/player.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
@@ -66,9 +66,6 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
 
           // Pause the queue
           await setQueuePaused(roomId, currentPositionMs);
-
-          // Cancel any pending auto-skip — song is now paused
-          await cancelAutoSkip(roomId);
 
           // Notify all remaining clients in the room
           io!.to(roomId).emit('player:pause', { roomId, currentPositionMs });

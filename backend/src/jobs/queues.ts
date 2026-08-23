@@ -21,16 +21,3 @@ export const seekSyncQueue = new Queue('seek-sync', {
   },
 });
 
-/**
- * Server-side auto-advance: fires when the current song's playback time is
- * exhausted. This handles the case where the admin's browser is closed —
- * the queue advances naturally on the server without any client involvement.
- */
-export const autoSkipQueue = new Queue('auto-skip', {
-  connection: createBullMQConnection(),
-
-  defaultJobOptions: {
-    removeOnComplete: true,
-    removeOnFail: { count: 20 },
-  },
-});
