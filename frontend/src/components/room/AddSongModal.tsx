@@ -222,20 +222,33 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
       return;
     }
 
-    // Text search (debounced 500 ms)
+    // Text search (debounced 1200 ms to save API quota)
     setSearching(true);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await searchYouTube(val.trim());
-        setResults(res);
-        setSearchError(res.length === 0 ? "No results found." : null);
-      } catch {
-        setSearchError("Search unavailable. Please paste a YouTube URL instead.");
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 500);
+    debounceRef.current = setTimeout(() => {
+      performSearch(val.trim());
+    }, 1200);
+  }
+
+  async function performSearch(searchQuery: string) {
+    if (!searchQuery) return;
+    setSearching(true);
+    try {
+      const res = await searchYouTube(searchQuery);
+      setResults(res);
+      setSearchError(res.length === 0 ? "No results found." : null);
+    } catch {
+      setSearchError("Search unavailable. Please paste a YouTube URL instead.");
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && query.trim()) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      performSearch(query.trim());
+    }
   }
 
   function selectResult(r: SearchResult) {
@@ -341,6 +354,7 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
                 }}
                 onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(163,190,140,0.5)")}
                 onBlur={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}
+                onKeyDown={handleKeyDown}
               />
               {query && (
                 <button
