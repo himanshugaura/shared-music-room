@@ -154,17 +154,20 @@ export const setQueueSeek = async (roomId: string, positionMs: number): Promise<
     playbackStartedAt: new Date(),
   });
 
-  // Phase 2 — BullMQ debounce (Postgres stays as source of truth)
-  // Using a fixed jobId per room means BullMQ replaces any existing
-  // delayed job for this room — previous seeks are automatically cancelled.
-  await seekSyncQueue.add(
+  // Phase 2 — BullMQ debounce (Postgres stays as source of truth).
+  // Fire-and-forget: if this fails (duplicate jobId, Redis hiccup), the Redis
+  // write above already happened, and the socket already broadcast the seek.
+  // The worst case is Postgres is slightly out of sync until the next seek or pause.
+  seekSyncQueue.add(
     'sync-seek',
     { roomId },
     {
       jobId: `seek-sync:${roomId}`,
       delay: 2_000,
     },
-  );
+  ).catch((err: unknown) => {
+    logger.warn({ roomId, err }, 'seek-sync: failed to enqueue BullMQ job (non-critical)');
+  });
 
   return true;
 };

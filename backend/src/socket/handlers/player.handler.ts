@@ -84,6 +84,9 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           return;
         }
 
+        // Phase 1: write to Redis immediately, broadcast to all clients, ack the admin.
+        // The BullMQ debounce (Postgres sync) is fire-and-forget inside setQueueSeek —
+        // it can never block or break the realtime broadcast.
         const found = await setQueueSeek(roomId, positionMs);
         if (!found) {
           ack?.({ ok: false, message: 'Queue not found' });
