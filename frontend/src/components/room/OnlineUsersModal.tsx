@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { OnlineUser } from "@/types/room";
 
 interface Props {
@@ -63,8 +64,13 @@ function UserAvatar({ user, size = 36 }: { user: OnlineUser; size?: number }) {
 export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentUserId }: Props) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
+  const [mounted, setMounted] = useState(false);
 
-  // Close on Escape
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Close on Escape key
   useEffect(() => {
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
@@ -74,7 +80,7 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onClose]);
 
-  // Close on backdrop click
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
@@ -86,7 +92,7 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const filtered = onlineUsers.filter((u) => {
     if (!search.trim()) return true;
@@ -97,17 +103,17 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
     );
   });
 
-  return (
+  const modalContent = (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 50,
+        zIndex: 99999,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0,0,0,0.65)",
-        backdropFilter: "blur(4px)",
+        background: "rgba(0,0,0,0.7)",
+        backdropFilter: "blur(6px)",
         padding: 16,
       }}
     >
@@ -115,14 +121,14 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
         ref={modalRef}
         style={{
           width: "100%",
-          maxWidth: 400,
-          maxHeight: "80vh",
+          maxWidth: 420,
+          maxHeight: "85vh",
           display: "flex",
           flexDirection: "column",
           borderRadius: 16,
           background: "#111620",
-          border: "1px solid rgba(255,255,255,0.1)",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(163,190,140,0.1)",
           overflow: "hidden",
           animation: "modalFadeIn 0.15s ease-out",
         }}
@@ -135,20 +141,22 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
             justifyContent: "space-between",
             padding: "16px 20px 14px",
             borderBottom: "1px solid rgba(255,255,255,0.06)",
+            flexShrink: 0,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               style={{
-                width: 10,
-                height: 10,
+                width: 9,
+                height: 9,
                 borderRadius: "50%",
                 background: "#a3be8c",
                 boxShadow: "0 0 8px #a3be8c",
                 display: "inline-block",
+                flexShrink: 0,
               }}
             />
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#eceff4" }}>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#eceff4" }}>
               Online Listeners
             </h2>
             <span
@@ -190,9 +198,9 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
           </button>
         </div>
 
-        {/* Optional search if many listeners */}
+        {/* Search if > 4 listeners */}
         {onlineUsers.length > 4 && (
-          <div style={{ padding: "12px 16px 8px" }}>
+          <div style={{ padding: "12px 16px 8px", flexShrink: 0 }}>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -213,9 +221,9 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
         )}
 
         {/* Users list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
           {filtered.length === 0 ? (
-            <p style={{ margin: 0, padding: "24px 0", textAlign: "center", color: "#6b7a8d", fontSize: 13 }}>
+            <p style={{ margin: 0, padding: "28px 0", textAlign: "center", color: "#6b7a8d", fontSize: 13 }}>
               No listeners found.
             </p>
           ) : (
@@ -231,22 +239,23 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
-                    padding: "8px 10px",
+                    padding: "8px 12px",
                     borderRadius: 10,
                     background: isYou ? "rgba(163,190,140,0.06)" : "rgba(255,255,255,0.02)",
-                    border: isYou ? "1px solid rgba(163,190,140,0.15)" : "1px solid transparent",
+                    border: isYou ? "1px solid rgba(163,190,140,0.18)" : "1px solid rgba(255,255,255,0.04)",
                     transition: "background 0.15s",
                   }}
                 >
-                  <div style={{ position: "relative" }}>
-                    <UserAvatar user={u} size={36} />
+                  {/* Left: Avatar with green active dot */}
+                  <div style={{ position: "relative", flexShrink: 0 }}>
+                    <UserAvatar user={u} size={38} />
                     <span
                       style={{
                         position: "absolute",
-                        bottom: -1,
-                        right: -1,
-                        width: 10,
-                        height: 10,
+                        bottom: 0,
+                        right: 0,
+                        width: 9,
+                        height: 9,
                         borderRadius: "50%",
                         background: "#a3be8c",
                         border: "2px solid #111620",
@@ -254,60 +263,25 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
                     />
                   </div>
 
+                  {/* Middle: Name and Username */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#eceff4",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {displayName}
-                      </span>
-
-                      {isYou && (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "1px 5px",
-                            borderRadius: 4,
-                            background: "rgba(163,190,140,0.2)",
-                            color: "#a3be8c",
-                          }}
-                        >
-                          YOU
-                        </span>
-                      )}
-
-                      {isOwner && (
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "1px 5px",
-                            borderRadius: 4,
-                            background: "rgba(235,203,139,0.15)",
-                            color: "#ebcb8b",
-                            border: "1px solid rgba(235,203,139,0.3)",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 3,
-                          }}
-                        >
-                          👑 HOST
-                        </span>
-                      )}
-                    </div>
-
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#eceff4",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {displayName}
+                    </p>
                     {u.username && (
                       <p
                         style={{
-                          margin: 0,
+                          margin: "2px 0 0",
                           fontSize: 11,
                           color: "#6b7a8d",
                           whiteSpace: "nowrap",
@@ -317,6 +291,45 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
                       >
                         @{u.username}
                       </p>
+                    )}
+                  </div>
+
+                  {/* Right: Badges */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    {isYou && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          background: "rgba(163,190,140,0.2)",
+                          color: "#a3be8c",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        YOU
+                      </span>
+                    )}
+
+                    {isOwner && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          background: "rgba(235,203,139,0.15)",
+                          color: "#ebcb8b",
+                          border: "1px solid rgba(235,203,139,0.3)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        👑 HOST
+                      </span>
                     )}
                   </div>
                 </div>
@@ -334,4 +347,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
       `}</style>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

@@ -30,6 +30,8 @@ export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUser
     <header
       className="room-header"
       style={{
+        position: "relative",
+        zIndex: 30,
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -80,84 +82,87 @@ export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUser
         )}
       </div>
 
-      {/* Online listeners button */}
-      <button
-        onClick={() => setUsersModalOpen(true)}
-        title="View online listeners"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "5px 10px",
-          borderRadius: 8,
-          border: "1px solid rgba(163,190,140,0.25)",
-          background: "rgba(163,190,140,0.08)",
-          color: "#eceff4",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: "pointer",
-          transition: "all 0.15s",
-          flexShrink: 0,
-          whiteSpace: "nowrap",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.14)";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.4)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.08)";
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.25)";
-        }}
-      >
-        <span
+      {/* Header action buttons */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {/* Online listeners button */}
+        <button
+          onClick={() => setUsersModalOpen(true)}
+          title="View online listeners"
           style={{
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: "#a3be8c",
-            boxShadow: "0 0 6px #a3be8c",
-            display: "inline-block",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 10px",
+            borderRadius: 8,
+            border: "1px solid rgba(163,190,140,0.25)",
+            background: "rgba(163,190,140,0.08)",
+            color: "#eceff4",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.15s",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
           }}
-        />
-        <span style={{ color: "#a3be8c", fontWeight: 700 }}>
-          {onlineUsers.length}
-        </span>
-        <span className="room-header-listeners-label" style={{ color: "#d8dee9", fontSize: 11 }}>
-          {onlineUsers.length === 1 ? "online" : "online"}
-        </span>
-      </button>
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.14)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.4)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.08)";
+            (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.25)";
+          }}
+        >
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "#a3be8c",
+              boxShadow: "0 0 6px #a3be8c",
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: "#a3be8c", fontWeight: 700 }}>
+            {onlineUsers.length}
+          </span>
+          <span className="room-header-listeners-label" style={{ color: "#d8dee9", fontSize: 11 }}>
+            {onlineUsers.length === 1 ? "online" : "online"}
+          </span>
+        </button>
 
-      {/* Room code */}
-      <button
-        onClick={copyCode}
-        title="Click to copy room code"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "5px 10px",
-          borderRadius: 8,
-          border: "1px solid rgba(255,255,255,0.1)",
-          background: "rgba(255,255,255,0.04)",
-          color: codeCopied ? "#a3be8c" : "#d8dee9",
-          fontSize: 12,
-          fontWeight: 600,
-          fontFamily: "monospace",
-          cursor: "pointer",
-          letterSpacing: "0.08em",
-          transition: "all 0.15s",
-          flexShrink: 0,
-          whiteSpace: "nowrap",
-        }}
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {codeCopied
-            ? <polyline points="20 6 9 17 4 12" />
-            : <><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1" /></>
-          }
-        </svg>
-        {room.roomCode}
-      </button>
+        {/* Room code */}
+        <button
+          onClick={copyCode}
+          title="Click to copy room code"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 10px",
+            borderRadius: 8,
+            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.04)",
+            color: codeCopied ? "#a3be8c" : "#d8dee9",
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: "monospace",
+            cursor: "pointer",
+            letterSpacing: "0.08em",
+            transition: "all 0.15s",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {codeCopied
+              ? <polyline points="20 6 9 17 4 12" />
+              : <><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1" /></>
+            }
+          </svg>
+          {room.roomCode}
+        </button>
+      </div>
 
       <OnlineUsersModal
         open={usersModalOpen}
