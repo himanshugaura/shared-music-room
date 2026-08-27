@@ -10,7 +10,7 @@
  *  • Expose typed emit helpers for the owner's player controls
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -18,7 +18,7 @@ import { getSocket } from "./useSocket";
 import { roomKeys } from "./useRoom";
 import { useAuthStore } from "@/store";
 import type { Socket } from "socket.io-client";
-import type { QueueSong, QueueState } from "@/types/room";
+import type { OnlineUser, QueueSong, QueueState } from "@/types/room";
 
 export interface RoomSocketCallbacks {
   /** Server confirmed play; `serverAt` is server timestamp for lag correction */
@@ -36,6 +36,7 @@ export interface RoomSocketCallbacks {
 export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {}) {
   const qc = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   
   // Retrieve current user ID to deduplicate self-triggered optimistic events
   const currentUserId = useAuthStore((s) => s.user?.id);
@@ -59,8 +60,12 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       socket.emit(
         "room:join",
         { roomId },
-        (res: { ok: boolean; message?: string }) => {
-          if (!res?.ok) toast.error(res?.message ?? "Could not join room.");
+        (res: { ok: boolean; message?: string; data?: { roomId: string; onlineUsers?: OnlineUser[] } }) => {
+          if (!res?.ok) {
+            toast.error(res?.message ?? "Could not join room.");
+          } else if (res.data?.onlineUsers) {
+            setOnlineUsers(res.data.onlineUsers);
+          }
         }
       );
 
@@ -175,6 +180,27 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         cbRef.current.onSync?.(payload.currentQueueSongId, payload.currentPositionMs, payload.playbackStartedAt, payload.at);
       };
 
+      // ── Member presence event listeners ────────────────────────────────────
+
+      const onMemberJoined = (payload: { user: OnlineUser; roomId: string; onlineUsers?: OnlineUser[] }) => {
+        if (payload.onlineUsers) {
+          setOnlineUsers(payload.onlineUsers);
+        } else {
+          setOnlineUsers((prev) => {
+            if (prev.some((u) => u.id === payload.user.id)) return prev;
+            return [...prev, payload.user];
+          });
+        }
+      };
+
+      const onMemberLeft = (payload: { userId: string; roomId: string; onlineUsers?: OnlineUser[] }) => {
+        if (payload.onlineUsers) {
+          setOnlineUsers(payload.onlineUsers);
+        } else {
+          setOnlineUsers((prev) => prev.filter((u) => u.id !== payload.userId));
+        }
+      };
+
       socket.on("player:play", onPlay);
       socket.on("player:pause", onPause);
       socket.on("player:seek", onSeek);
@@ -184,6 +210,8 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       socket.on("queue:song_voted", onSongVoted);
       socket.on("queueUpdated", onQueueUpdated);
       socket.on("queue:song_deleted", onSongDeleted);
+      socket.on("room:member_joined", onMemberJoined);
+      socket.on("room:member_left", onMemberLeft);
 
       // ── Cleanup ────────────────────────────────────────────────────────────
 
@@ -198,6 +226,8 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         socket.off("queue:song_voted", onSongVoted);
         socket.off("queueUpdated", onQueueUpdated);
         socket.off("queue:song_deleted", onSongDeleted);
+        socket.off("room:member_joined", onMemberJoined);
+        socket.off("room:member_left", onMemberLeft);
       };
     });
 
@@ -226,5 +256,5 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
     socketRef.current?.emit("player:request_sync", { roomId });
   }, [roomId]);
 
-  return { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync };
+  return { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync, onlineUsers };
 }

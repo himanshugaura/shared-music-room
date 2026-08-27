@@ -1,5 +1,12 @@
 export type Visibility = "public" | "private";
 
+export interface OnlineUser {
+  id: string;
+  name: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+}
+
 export interface RoomSummary {
   id: string;
   name: string;

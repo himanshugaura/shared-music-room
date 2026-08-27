@@ -1,7 +1,13 @@
 import type { Socket } from 'socket.io';
 
-export type SocketUser = {
+export type OnlineUser = {
   id: string;
+  name: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+};
+
+export type SocketUser = OnlineUser & {
   email: string | null;
 };
 

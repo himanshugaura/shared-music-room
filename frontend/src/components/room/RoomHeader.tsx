@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Room, QueueState } from "@/types/room";
+import type { Room, QueueState, OnlineUser } from "@/types/room";
+import { OnlineUsersModal } from "./OnlineUsersModal";
 
 interface Props {
   room: Room;
   queue: QueueState | undefined;
   isOwner: boolean;
+  onlineUsers?: OnlineUser[];
+  currentUserId?: string;
 }
 
-export function RoomHeader({ room, queue, isOwner }: Props) {
+export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUserId }: Props) {
   const [codeCopied, setCodeCopied] = useState(false);
+  const [usersModalOpen, setUsersModalOpen] = useState(false);
 
   function copyCode() {
     navigator.clipboard.writeText(room.roomCode).then(() => {
@@ -76,6 +80,53 @@ export function RoomHeader({ room, queue, isOwner }: Props) {
         )}
       </div>
 
+      {/* Online listeners button */}
+      <button
+        onClick={() => setUsersModalOpen(true)}
+        title="View online listeners"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "5px 10px",
+          borderRadius: 8,
+          border: "1px solid rgba(163,190,140,0.25)",
+          background: "rgba(163,190,140,0.08)",
+          color: "#eceff4",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          transition: "all 0.15s",
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.14)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.4)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "rgba(163,190,140,0.08)";
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(163,190,140,0.25)";
+        }}
+      >
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: "#a3be8c",
+            boxShadow: "0 0 6px #a3be8c",
+            display: "inline-block",
+          }}
+        />
+        <span style={{ color: "#a3be8c", fontWeight: 700 }}>
+          {onlineUsers.length}
+        </span>
+        <span className="room-header-listeners-label" style={{ color: "#d8dee9", fontSize: 11 }}>
+          {onlineUsers.length === 1 ? "online" : "online"}
+        </span>
+      </button>
+
       {/* Room code */}
       <button
         onClick={copyCode}
@@ -108,10 +159,19 @@ export function RoomHeader({ room, queue, isOwner }: Props) {
         {room.roomCode}
       </button>
 
+      <OnlineUsersModal
+        open={usersModalOpen}
+        onClose={() => setUsersModalOpen(false)}
+        onlineUsers={onlineUsers}
+        ownerId={room.ownerId}
+        currentUserId={currentUserId}
+      />
+
       <style>{`
         @media (max-width: 480px) {
           .room-header-back-label { display: none; }
           .room-header-divider { display: none; }
+          .room-header-listeners-label { display: none; }
         }
       `}</style>
     </header>

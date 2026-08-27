@@ -146,7 +146,7 @@ export function RoomPage({ roomId }: { roomId: string }) {
   );
 
   // Socket wiring
-  const { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync } = useRoomSocket(roomId, {
+  const { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync, onlineUsers } = useRoomSocket(roomId, {
     onPlay: handleSocketPlay,
     onPause: handleSocketPause,
     onSeek: handleSocketSeek,
@@ -280,6 +280,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
         room={room}
         queue={queue}
         isOwner={isOwner}
+        onlineUsers={onlineUsers}
+        currentUserId={user?.id}
       />
 
       {/* Main content: player left, queue right */}
