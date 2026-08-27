@@ -450,29 +450,66 @@ export function PlayerPanel({
               </button>
             </div>
 
-            {/* Owner indicator for listener skip votes */}
-            {skipVotes && skipVotes.currentVotes > 0 && (
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-                <span
+            {/* Owner Vote to Skip button */}
+            {currentSong && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
+                <button
+                  onClick={onVoteSkip}
+                  title={skipVotes?.hasVoted ? "Click to revoke skip vote" : "Vote to skip current track"}
                   style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    padding: "3px 10px",
-                    borderRadius: 12,
-                    background: "rgba(235,203,139,0.12)",
-                    color: "#ebcb8b",
-                    border: "1px solid rgba(235,203,139,0.25)",
+                    height: 28,
+                    padding: "0 12px",
+                    borderRadius: 14,
+                    border: skipVotes?.hasVoted
+                      ? "1px solid rgba(163,190,140,0.4)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                    background: skipVotes?.hasVoted
+                      ? "rgba(163,190,140,0.15)"
+                      : (skipVotes && skipVotes.currentVotes > 0)
+                      ? "rgba(235,203,139,0.1)"
+                      : "rgba(255,255,255,0.04)",
+                    color: skipVotes?.hasVoted
+                      ? "#a3be8c"
+                      : (skipVotes && skipVotes.currentVotes > 0)
+                      ? "#ebcb8b"
+                      : "#6b7a8d",
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.opacity = "0.85";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.opacity = "1";
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="5 4 15 12 5 20 5 4" />
                     <line x1="19" y1="5" x2="19" y2="19" />
                   </svg>
-                  {skipVotes.currentVotes}/{skipVotes.requiredVotes} listeners voted to skip
-                </span>
+                  <span>
+                    {skipVotes?.hasVoted ? "Voted to Skip" : "Vote to Skip"}
+                  </span>
+                  <span
+                    style={{
+                      padding: "1px 5px",
+                      borderRadius: 8,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: skipVotes?.hasVoted
+                        ? "rgba(163,190,140,0.25)"
+                        : "rgba(255,255,255,0.08)",
+                      color: skipVotes?.hasVoted ? "#a3be8c" : "inherit",
+                    }}
+                  >
+                    {skipVotes?.currentVotes ?? 0}/{skipVotes?.requiredVotes ?? 1}
+                  </span>
+                </button>
               </div>
             )}
           </>
