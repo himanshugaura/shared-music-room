@@ -34,7 +34,7 @@ export const addTrack = asyncHandler(async (req: Request, res: Response) => {
     durationMs,
   });
 
-  getIO().to(roomId).emit('queue:song_added', { roomId, song });
+  getIO().to(roomId).emit('queue:song_added', { roomId, song, autoStarted });
 
   if (autoStarted) {
     getIO().to(roomId).emit('player:play', { roomId, at: Date.now() });

@@ -26,7 +26,7 @@ export interface RoomSocketCallbacks {
   onPause?: (positionMs: number) => void;
   onSeek?: (positionMs: number) => void;
   /** nextSongId is null when queue is exhausted */
-  onSkip?: (nextSongId: string | null, serverAt: number) => void;
+  onSkip?: (nextSongId: string | null, serverAt: number, previousSongId?: string | null) => void;
   /** Fired when the server fast-forwarded the queue — may have skipped multiple songs */
   onSync?: (currentQueueSongId: string | null, positionMs: number, playbackStartedAt: string | null, serverAt: number) => void;
 }
@@ -115,22 +115,30 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       };
 
       const onSkip = ({
+        previousSongId,
         nextSongId,
         at,
       }: {
+        previousSongId?: string | null;
         nextSongId: string | null;
         at: number;
-      }) => cbRef.current.onSkip?.(nextSongId, at);
+      }) => cbRef.current.onSkip?.(nextSongId, at, previousSongId);
 
       // ── Queue event listeners ──────────────────────────────────────────────
 
-      const onSongAdded = ({ song }: { song: QueueSong }) => {
+      const onSongAdded = ({
+        song,
+        autoStarted,
+      }: {
+        song: QueueSong;
+        autoStarted?: boolean;
+      }) => {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
           // Guard against duplicates (REST mutation may have appended it already)
           if (prev.songs.some((s) => s.id === song.id)) return prev;
           
-          const isFirst = prev.songs.length === 0;
+          const isFirst = autoStarted ?? (!prev.currentQueueSongId || prev.songs.length === 0);
           return {
             ...prev,
             songs: [...prev.songs, song],

@@ -143,7 +143,12 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
 
         await clearSkipVotes(roomId, currentSongId);
 
-        io.to(roomId).emit('player:skip', { roomId, nextSongId, at: Date.now() });
+        io.to(roomId).emit('player:skip', {
+          roomId,
+          previousSongId: currentSongId,
+          nextSongId,
+          at: Date.now(),
+        });
         io.to(roomId).emit('player:skip_votes_updated', {
           roomId,
           currentVotes: 0,
@@ -203,7 +208,12 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
 
             await clearSkipVotes(roomId, songId);
 
-            io.to(roomId).emit('player:skip', { roomId, nextSongId, at: Date.now() });
+            io.to(roomId).emit('player:skip', {
+              roomId,
+              previousSongId: songId,
+              nextSongId,
+              at: Date.now(),
+            });
             io.to(roomId).emit('player:skip_votes_updated', {
               roomId,
               currentVotes: 0,

@@ -53,7 +53,7 @@ export function useAddTrack(roomId: string) {
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
         if (!prev) return prev;
         if (prev.songs.some((s) => s.id === song.id)) return prev;
-        const isFirst = prev.songs.length === 0;
+        const isFirst = !prev.currentQueueSongId || prev.songs.length === 0;
         return {
           ...prev,
           songs: [...prev.songs, song],

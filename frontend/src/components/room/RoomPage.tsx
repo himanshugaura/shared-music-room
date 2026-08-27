@@ -51,41 +51,54 @@ export function RoomPage({ roomId }: { roomId: string }) {
 
   const [isPlayerReady, setIsPlayerReady] = useState(false);
 
-  // ── Initial sync: load current song at correct position once queue arrives ──
+  // ── Active song sync: loads the video into YouTube player whenever the active song changes ──
 
-  const didInitRef = useRef(false);
+  const loadedSongIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!queue || !controlRef.current || !isPlayerReady || didInitRef.current) return;
+    if (!controlRef.current || !isPlayerReady) return;
 
-    const { currentQueueSongId, songs, isPlaying } = queue;
-    if (!currentQueueSongId) return;
+    if (!currentSong) {
+      if (loadedSongIdRef.current) {
+        controlRef.current.pause();
+        loadedSongIdRef.current = null;
+      }
+      return;
+    }
 
-    const song = songs.find((s) => s.id === currentQueueSongId);
-    if (!song) return;
-
-    didInitRef.current = true;
-    // calcPosition is called here — as late as possible — so the timestamp
-    // is maximally fresh.  PlayerPanel's pendingSyncRef will additionally
-    // apply a corrective seek once buffering finishes, accounting for the
-    // remaining gap between this call and the first PLAYING event.
-    const startSeconds = calcPosition(queue);
-    controlRef.current.loadVideo(song.youtubeVideoId, startSeconds, isPlaying);
-  }, [queue, isPlayerReady]);
+    // If a different song became the active song (e.g. initial load, auto-started song, or song advance)
+    if (loadedSongIdRef.current !== currentSong.id) {
+      loadedSongIdRef.current = currentSong.id;
+      const startSeconds = calcPosition(queue!);
+      controlRef.current.loadVideo(
+        currentSong.youtubeVideoId,
+        startSeconds,
+        queue?.isPlaying ?? true
+      );
+    }
+  }, [currentSong?.id, isPlayerReady, queue?.isPlaying]);
 
   // ── Socket event handlers ─────────────────────────────────────────────────
 
   const handleSocketPlay = useCallback((serverAt: number) => {
     const lagMs = Date.now() - serverAt;
-    controlRef.current?.play();
-    // Compensate for network lag: after a short moment (so the player has
-    // actually started), seek forward by however many ms the event was in-flight.
-    if (lagMs > 100) {
-      setTimeout(() => {
-        const cur = controlRef.current?.getCurrentTime() ?? 0;
-        controlRef.current?.seekTo(Math.max(0, cur + lagMs / 1000));
-      }, 200);
+    const freshQueue = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
+    const activeSong = freshQueue?.songs.find((s) => s.id === freshQueue.currentQueueSongId);
+
+    // If the active song is not currently loaded in the iframe, load it immediately
+    if (activeSong && loadedSongIdRef.current !== activeSong.id) {
+      loadedSongIdRef.current = activeSong.id;
+      const startSec = calcPosition(freshQueue!);
+      controlRef.current?.loadVideo(activeSong.youtubeVideoId, startSec, true);
+    } else {
+      controlRef.current?.play();
+      if (lagMs > 100) {
+        setTimeout(() => {
+          const cur = controlRef.current?.getCurrentTime() ?? 0;
+          controlRef.current?.seekTo(Math.max(0, cur + lagMs / 1000));
+        }, 200);
+      }
     }
-  }, []);
+  }, [qc, roomId]);
 
   const handleSocketPause = useCallback((positionMs: number) => {
     controlRef.current?.pause();
@@ -97,46 +110,43 @@ export function RoomPage({ roomId }: { roomId: string }) {
   }, []);
 
   const handleSocketSkip = useCallback(
-    (nextSongId: string | null, serverAt: number) => {
+    (nextSongId: string | null, serverAt: number, previousSongId?: string | null) => {
       // Update queue cache — remove the song that just ended and advance currentQueueSongId.
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
         if (!prev) return prev;
-        const currentSongId = prev.currentQueueSongId;
+        const currentSongId = previousSongId ?? prev.currentQueueSongId;
         const remainingSongs = prev.songs.filter(s => s.id !== currentSongId);
         return { ...prev, currentQueueSongId: nextSongId, songs: remainingSongs, isPlaying: !!nextSongId };
       });
 
       if (nextSongId) {
-        // Read from the freshly updated cache — NOT from the stale `queue` closure.
-        // qc.setQueryData is synchronous, so this immediately returns the new state.
         const fresh = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
         const song = fresh?.songs.find((s) => s.id === nextSongId);
         if (song) {
+          loadedSongIdRef.current = song.id;
           const lag = Math.max(0, (Date.now() - serverAt) / 1000);
-          controlRef.current?.loadVideo(song.youtubeVideoId, lag);
+          controlRef.current?.loadVideo(song.youtubeVideoId, lag, true);
         }
       } else {
+        loadedSongIdRef.current = null;
         controlRef.current?.pause();
       }
     },
-    [qc, roomId]  // ← no longer depends on stale `queue`
+    [qc, roomId]
   );
 
   const handleSocketSync = useCallback(
     (currentQueueSongId: string | null, positionMs: number, playbackStartedAt: string | null, serverAt: number) => {
       if (!currentQueueSongId) {
-        // Queue ran out
+        loadedSongIdRef.current = null;
         controlRef.current?.pause();
         return;
       }
-      // Read from the freshly-updated cache (setQueryData in onSync is synchronous)
       const fresh = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
       const song = fresh?.songs.find((s) => s.id === currentQueueSongId);
       if (!song) return;
 
-      // Compute how far into the song we are right now:
-      // The server set playbackStartedAt = Date.now() - remainingVirtualMs,
-      // so elapsed = Date.now() - playbackStartedAt = remainingVirtualMs + network lag.
+      loadedSongIdRef.current = song.id;
       const elapsed = playbackStartedAt
         ? Math.max(0, (Date.now() - new Date(playbackStartedAt).getTime()) / 1000)
         : positionMs / 1000;
