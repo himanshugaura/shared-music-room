@@ -88,6 +88,15 @@ export function PlayerPanel({
   const onEndedRef = useRef(onEnded);
   onEndedRef.current = onEnded;
 
+  const lastSongIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentSong?.id !== lastSongIdRef.current) {
+      lastSongIdRef.current = currentSong?.id ?? null;
+      setCurrentSec(0);
+      setDuration(currentSong ? Math.floor(currentSong.durationMs / 1000) : 0);
+    }
+  }, [currentSong?.id, currentSong?.durationMs]);
+
   /**
    * Pending position sync: set when loadVideo is called with autoplay=true.
    * On the first PLAYING state-change after the load (which fires *after*
@@ -133,22 +142,21 @@ export function PlayerPanel({
               setDuration(ytRef.current?.getDuration() ?? 0);
 
               // ── Corrective seek after buffering ──────────────────────
-              // The YT API's startSeconds is often ignored on cold-start.
-              // We recorded positionMs + the wall-clock time when loadVideo
-              // was called. Now that playback has actually started we can
-              // compute the exact target and snap to it.
               if (pendingSyncRef.current) {
                 const { positionMs, requestedAt } = pendingSyncRef.current;
                 pendingSyncRef.current = null; // consume — only run once per load
                 const elapsedMs = Date.now() - requestedAt;
                 const targetSec = Math.max(0, (positionMs + elapsedMs) / 1000);
-                // Only seek if we'd end up more than 1 s away from where the
-                // player naturally landed (avoids a jarring seek on fast loads
-                // that already landed in the right spot).
-                const actualSec = ytRef.current?.getCurrentTime() ?? 0;
-                if (Math.abs(actualSec - targetSec) > 1) {
-                  ytRef.current?.seekTo(targetSec, true);
-                  setCurrentSec(targetSec);
+
+                // Snap clean start to 0:00 if near the start (< 2s)
+                if (targetSec < 2) {
+                  setCurrentSec(0);
+                } else {
+                  const actualSec = ytRef.current?.getCurrentTime() ?? 0;
+                  if (Math.abs(actualSec - targetSec) > 1) {
+                    ytRef.current?.seekTo(targetSec, true);
+                    setCurrentSec(targetSec);
+                  }
                 }
               }
             } else if (data === YS.PAUSED) {

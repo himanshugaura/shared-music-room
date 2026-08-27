@@ -68,7 +68,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
     // If a different song became the active song (e.g. initial load, auto-started song, or song advance)
     if (loadedSongIdRef.current !== currentSong.id) {
       loadedSongIdRef.current = currentSong.id;
-      const startSeconds = calcPosition(queue!);
+      const rawPosition = calcPosition(queue!);
+      const startSeconds = rawPosition < 2 ? 0 : rawPosition;
       controlRef.current.loadVideo(
         currentSong.youtubeVideoId,
         startSeconds,
@@ -87,7 +88,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
     // If the active song is not currently loaded in the iframe, load it immediately
     if (activeSong && loadedSongIdRef.current !== activeSong.id) {
       loadedSongIdRef.current = activeSong.id;
-      const startSec = calcPosition(freshQueue!);
+      const rawPos = calcPosition(freshQueue!);
+      const startSec = rawPos < 2 ? 0 : rawPos;
       controlRef.current?.loadVideo(activeSong.youtubeVideoId, startSec, true);
     } else {
       controlRef.current?.play();
@@ -111,12 +113,21 @@ export function RoomPage({ roomId }: { roomId: string }) {
 
   const handleSocketSkip = useCallback(
     (nextSongId: string | null, serverAt: number, previousSongId?: string | null) => {
-      // Update queue cache — remove the song that just ended and advance currentQueueSongId.
+      const nowIso = new Date(serverAt).toISOString();
+
+      // Update queue cache — remove the song that just ended and advance currentQueueSongId with position 0.
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
         if (!prev) return prev;
         const currentSongId = previousSongId ?? prev.currentQueueSongId;
-        const remainingSongs = prev.songs.filter(s => s.id !== currentSongId);
-        return { ...prev, currentQueueSongId: nextSongId, songs: remainingSongs, isPlaying: !!nextSongId };
+        const remainingSongs = prev.songs.filter((s) => s.id !== currentSongId);
+        return {
+          ...prev,
+          currentQueueSongId: nextSongId,
+          songs: remainingSongs,
+          isPlaying: !!nextSongId,
+          currentPositionMs: 0,
+          playbackStartedAt: nextSongId ? nowIso : null,
+        };
       });
 
       if (nextSongId) {
@@ -125,7 +136,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
         if (song) {
           loadedSongIdRef.current = song.id;
           const lag = Math.max(0, (Date.now() - serverAt) / 1000);
-          controlRef.current?.loadVideo(song.youtubeVideoId, lag, true);
+          const startSeconds = lag > 2 ? lag : 0;
+          controlRef.current?.loadVideo(song.youtubeVideoId, startSeconds, true);
         }
       } else {
         loadedSongIdRef.current = null;

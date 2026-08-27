@@ -122,7 +122,22 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         previousSongId?: string | null;
         nextSongId: string | null;
         at: number;
-      }) => cbRef.current.onSkip?.(nextSongId, at, previousSongId);
+      }) => {
+        qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
+          if (!prev) return prev;
+          const currentSongId = previousSongId ?? prev.currentQueueSongId;
+          const remainingSongs = prev.songs.filter((s) => s.id !== currentSongId);
+          return {
+            ...prev,
+            currentQueueSongId: nextSongId,
+            songs: remainingSongs,
+            isPlaying: !!nextSongId,
+            currentPositionMs: 0,
+            playbackStartedAt: nextSongId ? new Date(at).toISOString() : null,
+          };
+        });
+        cbRef.current.onSkip?.(nextSongId, at, previousSongId);
+      };
 
       // ── Queue event listeners ──────────────────────────────────────────────
 
