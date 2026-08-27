@@ -55,19 +55,27 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       if (!mounted) return;
       socketRef.current = socket;
 
-      if (!socket.connected) socket.connect();
-
-      socket.emit(
-        "room:join",
-        { roomId },
-        (res: { ok: boolean; message?: string; data?: { roomId: string; onlineUsers?: OnlineUser[] } }) => {
-          if (!res?.ok) {
-            toast.error(res?.message ?? "Could not join room.");
-          } else if (res.data?.onlineUsers) {
-            setOnlineUsers(res.data.onlineUsers);
+      const joinRoom = () => {
+        socket.emit(
+          "room:join",
+          { roomId },
+          (res: { ok: boolean; message?: string; data?: { roomId: string; onlineUsers?: OnlineUser[] } }) => {
+            if (!res?.ok) {
+              toast.error(res?.message ?? "Could not join room.");
+            } else if (res.data?.onlineUsers) {
+              setOnlineUsers(res.data.onlineUsers);
+            }
           }
-        }
-      );
+        );
+      };
+
+      if (!socket.connected) {
+        socket.connect();
+      } else {
+        joinRoom();
+      }
+
+      socket.on("connect", joinRoom);
 
       // ── Player event listeners ─────────────────────────────────────────────
 
@@ -201,6 +209,12 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         }
       };
 
+      const onOnlineUsersUpdated = (payload: { roomId: string; onlineUsers: OnlineUser[] }) => {
+        if (payload.onlineUsers) {
+          setOnlineUsers(payload.onlineUsers);
+        }
+      };
+
       socket.on("player:play", onPlay);
       socket.on("player:pause", onPause);
       socket.on("player:seek", onSeek);
@@ -210,12 +224,14 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       socket.on("queue:song_voted", onSongVoted);
       socket.on("queueUpdated", onQueueUpdated);
       socket.on("queue:song_deleted", onSongDeleted);
+      socket.on("room:online_users_updated", onOnlineUsersUpdated);
       socket.on("room:member_joined", onMemberJoined);
       socket.on("room:member_left", onMemberLeft);
 
       // ── Cleanup ────────────────────────────────────────────────────────────
 
       return () => {
+        socket.off("connect", joinRoom);
         socket.emit("room:leave", { roomId });
         socket.off("player:play", onPlay);
         socket.off("player:pause", onPause);
@@ -226,6 +242,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         socket.off("queue:song_voted", onSongVoted);
         socket.off("queueUpdated", onQueueUpdated);
         socket.off("queue:song_deleted", onSongDeleted);
+        socket.off("room:online_users_updated", onOnlineUsersUpdated);
         socket.off("room:member_joined", onMemberJoined);
         socket.off("room:member_left", onMemberLeft);
       };

@@ -7,6 +7,8 @@ type RoomJoinPayload = { roomId: string };
 type RoomLeavePayload = { roomId: string };
 
 export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): void => {
+  const isSocketLive = (socketId: string) => io.sockets.sockets.has(socketId);
+
   socket.on(
     'room:join',
     async (
@@ -32,11 +34,18 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
           roomId,
           socket.id,
           onlineUser,
+          isSocketLive,
         );
 
         await socket.join(roomId);
 
-        // Notify other room members if this is the user's first active tab/device
+        // Always broadcast the updated online list to the room so all clients sync in real-time
+        io.to(roomId).emit('room:online_users_updated', {
+          roomId,
+          onlineUsers,
+        });
+
+        // Notify other room members if this is the user's first active socket
         if (isFirstSocket) {
           socket.to(roomId).emit('room:member_joined', {
             user: onlineUser,
@@ -58,9 +67,16 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
         roomId,
         socket.id,
         socket.user.id,
+        isSocketLive,
       );
 
       await socket.leave(roomId);
+
+      // Always broadcast the updated online list to the room
+      io.to(roomId).emit('room:online_users_updated', {
+        roomId,
+        onlineUsers: remainingUsers,
+      });
 
       if (isLastSocket) {
         socket.to(roomId).emit('room:member_left', {
@@ -80,7 +96,7 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
     'room:get_online_users',
     async ({ roomId }: { roomId: string }, ack?: (res: AckResponse<OnlineUser[]>) => void) => {
       try {
-        const users = await getOnlineUsers(roomId);
+        const users = await getOnlineUsers(roomId, isSocketLive);
         ack?.({ ok: true, data: users });
       } catch {
         ack?.({ ok: false, message: 'Failed to fetch online users' });
@@ -99,7 +115,13 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
           roomId,
           socket.id,
           socket.user.id,
+          isSocketLive,
         );
+
+        io.to(roomId).emit('room:online_users_updated', {
+          roomId,
+          onlineUsers: remainingUsers,
+        });
 
         if (isLastSocket) {
           socket.to(roomId).emit('room:member_left', {
