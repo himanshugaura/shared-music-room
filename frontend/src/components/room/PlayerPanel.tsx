@@ -32,6 +32,16 @@ function fmtSec(sec: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+function disableCaptions(player: YTPlayer | null) {
+  if (!player) return;
+  try {
+    const p = player as any;
+    p.unloadModule?.("captions");
+    p.unloadModule?.("cc");
+    p.setOption?.("captions", "track", {});
+  } catch {}
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface PlayerControls {
@@ -122,6 +132,7 @@ export function PlayerPanel({
           rel: 0,
           modestbranding: 1,
           iv_load_policy: 3,
+          cc_load_policy: 3,
           enablejsapi: 1,
           playsinline: 1,
           disablekb: 1,
@@ -131,6 +142,7 @@ export function PlayerPanel({
           onReady: ({ target }) => {
             if (!mounted) return;
             ytRef.current = target;
+            disableCaptions(target);
             if (onPlayerReady) onPlayerReady();
           },
           onStateChange: ({ data }) => {
@@ -140,6 +152,7 @@ export function PlayerPanel({
               setIsPlaying(true);
               setBuffering(false);
               setDuration(ytRef.current?.getDuration() ?? 0);
+              disableCaptions(ytRef.current);
 
               // ── Corrective seek after buffering ──────────────────────
               if (pendingSyncRef.current) {
@@ -214,6 +227,7 @@ export function PlayerPanel({
           pendingSyncRef.current = null; // cued videos don't need correction
           ytRef.current?.cueVideoById({ videoId, startSeconds });
         }
+        disableCaptions(ytRef.current);
         setCurrentSec(startSeconds);
       },
     };

@@ -165,11 +165,18 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
           controls: 1,
           modestbranding: 1,
           rel: 0,
+          cc_load_policy: 3,
+          iv_load_policy: 3,
         },
         events: {
           onReady: ({ target }) => {
             if (cancelled) return;
             playerRef.current = target;
+            try {
+              (target as any).unloadModule?.("captions");
+              (target as any).unloadModule?.("cc");
+              (target as any).setOption?.("captions", "track", {});
+            } catch {}
             const dur = target.getDuration();
             setPreviewLoading(false);
             setSelectedVideo((prev) =>
