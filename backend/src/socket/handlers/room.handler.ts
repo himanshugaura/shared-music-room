@@ -1,6 +1,8 @@
 import type { Server } from 'socket.io';
 import { findRoomExistsById } from '../../modules/room/room.service.js';
 import { addRoomMember, getOnlineUsers, removeRoomMember } from '../../redis/presence.js';
+import { getPlayerState } from '../../redis/player.js';
+import { getSkipVotes } from '../../redis/skipVotes.js';
 import type { AckResponse, AuthenticatedSocket, OnlineUser } from '../types.js';
 
 type RoomJoinPayload = { roomId: string };
@@ -8,6 +10,22 @@ type RoomLeavePayload = { roomId: string };
 
 export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): void => {
   const isSocketLive = (socketId: string) => io.sockets.sockets.has(socketId);
+
+  const syncSkipVotesThreshold = async (roomId: string, onlineCount: number) => {
+    try {
+      const state = await getPlayerState(roomId);
+      if (state?.currentQueueSongId) {
+        const skipVotes = await getSkipVotes(roomId, state.currentQueueSongId);
+        const requiredVotes = Math.floor(Math.max(1, onlineCount) / 2) + 1;
+        io.to(roomId).emit('player:skip_votes_updated', {
+          roomId,
+          currentVotes: skipVotes.currentVotes,
+          requiredVotes,
+          userIds: skipVotes.userIds,
+        });
+      }
+    } catch {}
+  };
 
   socket.on(
     'room:join',
@@ -45,6 +63,8 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
           onlineUsers,
         });
 
+        syncSkipVotesThreshold(roomId, onlineUsers.length);
+
         // Notify other room members if this is the user's first active socket
         if (isFirstSocket) {
           socket.to(roomId).emit('room:member_joined', {
@@ -77,6 +97,8 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
         roomId,
         onlineUsers: remainingUsers,
       });
+
+      syncSkipVotesThreshold(roomId, remainingUsers.length);
 
       if (isLastSocket) {
         socket.to(roomId).emit('room:member_left', {
@@ -122,6 +144,8 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
           roomId,
           onlineUsers: remainingUsers,
         });
+
+        syncSkipVotesThreshold(roomId, remainingUsers.length);
 
         if (isLastSocket) {
           socket.to(roomId).emit('room:member_left', {

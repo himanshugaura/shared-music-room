@@ -31,12 +31,23 @@ export interface RoomSocketCallbacks {
   onSync?: (currentQueueSongId: string | null, positionMs: number, playbackStartedAt: string | null, serverAt: number) => void;
 }
 
+export interface SkipVoteState {
+  currentVotes: number;
+  requiredVotes: number;
+  hasVoted: boolean;
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {}) {
   const qc = useQueryClient();
   const socketRef = useRef<Socket | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [skipVotes, setSkipVotes] = useState<SkipVoteState>({
+    currentVotes: 0,
+    requiredVotes: 1,
+    hasVoted: false,
+  });
   
   // Retrieve current user ID to deduplicate self-triggered optimistic events
   const currentUserId = useAuthStore((s) => s.user?.id);
@@ -215,11 +226,31 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         }
       };
 
+      const onSkipVotesUpdated = (payload: {
+        roomId: string;
+        currentVotes: number;
+        requiredVotes: number;
+        userIds: string[];
+      }) => {
+        setSkipVotes({
+          currentVotes: payload.currentVotes,
+          requiredVotes: payload.requiredVotes,
+          hasVoted: !!currentUserId && payload.userIds.includes(currentUserId),
+        });
+      };
+
       socket.on("player:play", onPlay);
       socket.on("player:pause", onPause);
       socket.on("player:seek", onSeek);
-      socket.on("player:skip", onSkip);
-      socket.on("player:sync", onSync);
+      socket.on("player:skip", (payload) => {
+        setSkipVotes((prev) => ({ ...prev, currentVotes: 0, hasVoted: false }));
+        onSkip(payload);
+      });
+      socket.on("player:sync", (payload) => {
+        setSkipVotes((prev) => ({ ...prev, currentVotes: 0, hasVoted: false }));
+        onSync(payload);
+      });
+      socket.on("player:skip_votes_updated", onSkipVotesUpdated);
       socket.on("queue:song_added", onSongAdded);
       socket.on("queue:song_voted", onSongVoted);
       socket.on("queueUpdated", onQueueUpdated);
@@ -236,8 +267,9 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         socket.off("player:play", onPlay);
         socket.off("player:pause", onPause);
         socket.off("player:seek", onSeek);
-        socket.off("player:skip", onSkip);
-        socket.off("player:sync", onSync);
+        socket.off("player:skip");
+        socket.off("player:sync");
+        socket.off("player:skip_votes_updated", onSkipVotesUpdated);
         socket.off("queue:song_added", onSongAdded);
         socket.off("queue:song_voted", onSongVoted);
         socket.off("queueUpdated", onQueueUpdated);
@@ -249,7 +281,7 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
     });
 
     return () => { mounted = false; };
-  }, [roomId, qc]);
+  }, [roomId, qc, currentUserId]);
 
   // ── Owner emit helpers ────────────────────────────────────────────────────
 
@@ -273,5 +305,33 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
     socketRef.current?.emit("player:request_sync", { roomId });
   }, [roomId]);
 
-  return { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync, onlineUsers };
+  const emitVoteSkip = useCallback(() => {
+    socketRef.current?.emit(
+      "player:vote_skip",
+      { roomId },
+      (res: { ok: boolean; message?: string; data?: { hasVoted: boolean; currentVotes: number; requiredVotes: number } }) => {
+        if (!res?.ok) {
+          toast.error(res?.message ?? "Could not vote to skip.");
+        } else if (res.data) {
+          setSkipVotes((prev) => ({
+            ...prev,
+            hasVoted: res.data!.hasVoted,
+            currentVotes: res.data!.currentVotes,
+            requiredVotes: res.data!.requiredVotes,
+          }));
+        }
+      }
+    );
+  }, [roomId]);
+
+  return {
+    emitPlay,
+    emitPause,
+    emitSeek,
+    emitSkip,
+    emitRequestSync,
+    emitVoteSkip,
+    onlineUsers,
+    skipVotes,
+  };
 }

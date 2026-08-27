@@ -9,7 +9,9 @@ import {
 } from '../../modules/queue/queue.service.js';
 import { logger } from '../../utils/logger.js';
 import { findRoomOwnerById } from '../../modules/room/room.service.js';
-import { patchPlayerState } from '../../redis/player.js';
+import { patchPlayerState, getPlayerState } from '../../redis/player.js';
+import { clearSkipVotes, toggleSkipVote } from '../../redis/skipVotes.js';
+import { getOnlineUsers } from '../../redis/presence.js';
 import type { AckResponse, AuthenticatedSocket } from '../types.js';
 
 type RoomPayload = { roomId: string };
@@ -139,10 +141,92 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           }).catch(() => {/* swallowed — non-critical */});
         }
 
+        await clearSkipVotes(roomId, currentSongId);
+
         io.to(roomId).emit('player:skip', { roomId, nextSongId, at: Date.now() });
+        io.to(roomId).emit('player:skip_votes_updated', {
+          roomId,
+          currentVotes: 0,
+          requiredVotes: 1,
+          userIds: [],
+        });
         ack?.({ ok: true, data: { nextSongId } });
       } catch {
         ack?.({ ok: false, message: 'Failed to skip' });
+      }
+    },
+  );
+
+  socket.on(
+    'player:vote_skip',
+    async (
+      { roomId }: RoomPayload,
+      ack?: (res: AckResponse<{ hasVoted: boolean; currentVotes: number; requiredVotes: number }>) => void,
+    ) => {
+      try {
+        const state = await getPlayerState(roomId);
+        if (!state || !state.isPlaying || !state.currentQueueSongId) {
+          ack?.({ ok: false, message: 'No song is currently playing' });
+          return;
+        }
+
+        const songId = state.currentQueueSongId;
+        const isSocketLive = (id: string) => io.sockets.sockets.has(id);
+        const onlineUsers = await getOnlineUsers(roomId, isSocketLive);
+        const requiredVotes = Math.floor(Math.max(1, onlineUsers.length) / 2) + 1;
+
+        const { hasVoted, currentVotes, userIds } = await toggleSkipVote(
+          roomId,
+          songId,
+          socket.user.id,
+        );
+
+        if (currentVotes >= requiredVotes) {
+          // Vote passed! Advance to next song
+          const songWithQueue = await findSongWithQueue(songId);
+          if (songWithQueue) {
+            const updatedQueue = await advanceToNextSong(
+              songWithQueue.queue.id,
+              songWithQueue.position,
+            );
+
+            const nextSongId = updatedQueue?.currentQueueSongId ?? null;
+
+            if (updatedQueue) {
+              patchPlayerState(roomId, {
+                isPlaying: updatedQueue.isPlaying,
+                currentPositionMs: 0,
+                playbackStartedAt: updatedQueue.playbackStartedAt,
+                currentQueueSongId: updatedQueue.currentQueueSongId,
+              }).catch(() => {});
+            }
+
+            await clearSkipVotes(roomId, songId);
+
+            io.to(roomId).emit('player:skip', { roomId, nextSongId, at: Date.now() });
+            io.to(roomId).emit('player:skip_votes_updated', {
+              roomId,
+              currentVotes: 0,
+              requiredVotes,
+              userIds: [],
+            });
+
+            ack?.({ ok: true, data: { hasVoted, currentVotes: 0, requiredVotes } });
+            return;
+          }
+        }
+
+        // Broadcast updated votes to the room
+        io.to(roomId).emit('player:skip_votes_updated', {
+          roomId,
+          currentVotes,
+          requiredVotes,
+          userIds,
+        });
+
+        ack?.({ ok: true, data: { hasVoted, currentVotes, requiredVotes } });
+      } catch {
+        ack?.({ ok: false, message: 'Failed to vote to skip' });
       }
     },
   );
@@ -158,6 +242,10 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
 
         if (!advanced) return; // Song still playing — do NOT emit (would cause a restart)
 
+        if (advanced.currentQueueSongId) {
+          await clearSkipVotes(roomId, advanced.currentQueueSongId);
+        }
+
         // Broadcast the new state to every client in the room
         io.to(roomId).emit('player:sync', {
           roomId,
@@ -166,6 +254,13 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           currentPositionMs: 0,
           playbackStartedAt: advanced.playbackStartedAt?.toISOString() ?? null,
           at: Date.now(),
+        });
+
+        io.to(roomId).emit('player:skip_votes_updated', {
+          roomId,
+          currentVotes: 0,
+          requiredVotes: 1,
+          userIds: [],
         });
       } catch (err) {
         logger.error({ err, roomId }, 'Failed to process sync request');

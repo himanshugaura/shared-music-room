@@ -22,6 +22,7 @@ import {
 } from "react";
 import type { QueueSong, QueueState } from "@/types/room";
 import type { YTPlayer } from "@/types/youtube";
+import type { SkipVoteState } from "@/hooks/useRoomSocket";
 import { ensureYTApi } from "@/lib/youtube";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ interface Props {
   onEnded: () => void;
   controlRef: React.MutableRefObject<PlayerControls | null>;
   onPlayerReady?: () => void;
+  skipVotes?: SkipVoteState;
+  onVoteSkip?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -67,6 +70,8 @@ export function PlayerPanel({
   onEnded,
   controlRef,
   onPlayerReady,
+  skipVotes,
+  onVoteSkip,
 }: Props) {
   const playerContainerId = "yt-main-player";
   const ytRef = useRef<YTPlayer | null>(null);
@@ -444,38 +449,124 @@ export function PlayerPanel({
                 </svg>
               </button>
             </div>
+
+            {/* Owner indicator for listener skip votes */}
+            {skipVotes && skipVotes.currentVotes > 0 && (
+              <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "3px 10px",
+                    borderRadius: 12,
+                    background: "rgba(235,203,139,0.12)",
+                    color: "#ebcb8b",
+                    border: "1px solid rgba(235,203,139,0.25)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 4 15 12 5 20 5 4" />
+                    <line x1="19" y1="5" x2="19" y2="19" />
+                  </svg>
+                  {skipVotes.currentVotes}/{skipVotes.requiredVotes} listeners voted to skip
+                </span>
+              </div>
+            )}
           </>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
             {/* Mute Button for members */}
             <button
               onClick={handleToggleMute}
               title={isMuted ? "Unmute" : "Mute"}
               style={{
-                width: 42, height: 42, borderRadius: "50%",
+                width: 40, height: 40, borderRadius: "50%",
                 border: "1px solid rgba(255,255,255,0.1)",
                 background: "rgba(255,255,255,0.04)",
                 color: "#d8dee9",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: "pointer",
                 transition: "background 0.12s",
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.1)"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.04)"; }}
             >
               {isMuted ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                   <line x1="23" y1="9" x2="17" y2="15"></line>
                   <line x1="17" y1="9" x2="23" y2="15"></line>
                 </svg>
               ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
                   <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                 </svg>
               )}
             </button>
+
+            {/* Vote to Skip Button */}
+            {currentSong && (
+              <button
+                onClick={onVoteSkip}
+                title={skipVotes?.hasVoted ? "Click to revoke skip vote" : "Vote to skip current track"}
+                style={{
+                  height: 40,
+                  padding: "0 14px",
+                  borderRadius: 20,
+                  border: skipVotes?.hasVoted
+                    ? "1px solid rgba(163,190,140,0.4)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  background: skipVotes?.hasVoted
+                    ? "rgba(163,190,140,0.15)"
+                    : "rgba(255,255,255,0.04)",
+                  color: skipVotes?.hasVoted ? "#a3be8c" : "#d8dee9",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  transition: "all 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = skipVotes?.hasVoted
+                    ? "rgba(163,190,140,0.22)"
+                    : "rgba(255,255,255,0.08)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background = skipVotes?.hasVoted
+                    ? "rgba(163,190,140,0.15)"
+                    : "rgba(255,255,255,0.04)";
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 4 15 12 5 20 5 4" />
+                  <line x1="19" y1="5" x2="19" y2="19" />
+                </svg>
+                <span>
+                  {skipVotes?.hasVoted ? "Voted to Skip" : "Vote to Skip"}
+                </span>
+                <span
+                  style={{
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: skipVotes?.hasVoted
+                      ? "rgba(163,190,140,0.25)"
+                      : "rgba(255,255,255,0.08)",
+                    color: skipVotes?.hasVoted ? "#a3be8c" : "#8b949e",
+                  }}
+                >
+                  {skipVotes?.currentVotes ?? 0}/{skipVotes?.requiredVotes ?? 1}
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>

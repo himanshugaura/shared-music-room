@@ -146,7 +146,16 @@ export function RoomPage({ roomId }: { roomId: string }) {
   );
 
   // Socket wiring
-  const { emitPlay, emitPause, emitSeek, emitSkip, emitRequestSync, onlineUsers } = useRoomSocket(roomId, {
+  const {
+    emitPlay,
+    emitPause,
+    emitSeek,
+    emitSkip,
+    emitRequestSync,
+    emitVoteSkip,
+    onlineUsers,
+    skipVotes,
+  } = useRoomSocket(roomId, {
     onPlay: handleSocketPlay,
     onPause: handleSocketPause,
     onSeek: handleSocketSeek,
@@ -306,6 +315,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
           onEnded={handleEnded}
           controlRef={controlRef}
           onPlayerReady={() => setIsPlayerReady(true)}
+          skipVotes={skipVotes}
+          onVoteSkip={emitVoteSkip}
         />
 
         <QueuePanel
