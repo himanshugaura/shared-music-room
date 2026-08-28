@@ -32,7 +32,6 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
         borderLeft: "1px solid rgba(255,255,255,0.06)",
       }}
     >
-      {/* Panel header */}
       <div
         style={{
           display: "flex",
@@ -94,7 +93,7 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
             </button>
           )}
 
-          <button
+            <button
             onClick={() => setAddOpen(true)}
             style={{
               display: "flex",
@@ -122,7 +121,6 @@ export function QueuePanel({ roomId, queue, currentUserId, isOwner }: Props) {
         </div>
       </div>
 
-      {/* Song list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
         {filteredAndSorted.length === 0 ? (
           <div

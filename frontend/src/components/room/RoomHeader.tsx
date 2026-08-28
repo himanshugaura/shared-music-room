@@ -44,7 +44,6 @@ export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUser
         minWidth: 0,
       }}
     >
-      {/* Back */}
       <Link
         href="/dashboard"
         className="room-header-back"
@@ -70,7 +69,6 @@ export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUser
 
       <div className="room-header-divider" style={{ width: 1, height: 20, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
 
-      {/* Room name */}
       <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
         <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#eceff4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {room.name}
@@ -82,9 +80,7 @@ export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUser
         )}
       </div>
 
-      {/* Header action buttons */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        {/* Online listeners button */}
         <button
           onClick={() => setUsersModalOpen(true)}
           title="View online listeners"
@@ -131,7 +127,6 @@ export function RoomHeader({ room, queue, isOwner, onlineUsers = [], currentUser
           </span>
         </button>
 
-        {/* Room code */}
         <button
           onClick={copyCode}
           title="Click to copy room code"

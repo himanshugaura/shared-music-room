@@ -23,15 +23,12 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
   const voteLockRef = React.useRef(false);
 
   function handleVote(type: "up" | "down") {
-    // 1. Synchronously block accidental double-clicks (stops spam bugs)
     if (voteLockRef.current) return;
     voteLockRef.current = true;
 
-    // 2. Reddit-style logic: if you click the same button, it removes your vote. Otherwise it votes/swaps.
     const prevVote = song.userVote ?? null;
     const next: "up" | "down" | "remove" = prevVote === type ? "remove" : type;
 
-    // 3. Fire mutation (optimistic UI happens instantly)
     vote(
       { songId: song.id, voteType: next },
       { onSettled: () => { voteLockRef.current = false; } }
@@ -53,7 +50,6 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
         transition: "background 0.15s",
       }}
     >
-      {/* Thumbnail */}
       <div style={{ position: "relative", flexShrink: 0 }}>
         {song.thumbnail ? (
           <img
@@ -76,7 +72,6 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
             background: "rgba(163,190,140,0.25)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            {/* Animated playing bars */}
             <svg width="16" height="16" viewBox="0 0 16 16" fill="#a3be8c">
               <rect x="1" y="8" width="3" height="8" rx="1">
                 <animate attributeName="height" values="8;14;8" dur="0.8s" repeatCount="indefinite" />
@@ -95,7 +90,6 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
         )}
       </div>
 
-      {/* Title + duration */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
           margin: 0, fontSize: 13, fontWeight: isCurrent ? 600 : 400,
@@ -117,12 +111,10 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
         </div>
       </div>
 
-      {/* Vote score */}
       <span style={{ fontSize: 11, color: song.voteScore > 0 ? "#a3be8c" : song.voteScore < 0 ? "#bf616a" : "#6b7a8d", fontWeight: 600, flexShrink: 0 }}>
         {song.voteScore > 0 ? `+${song.voteScore}` : song.voteScore}
       </span>
 
-      {/* Vote buttons */}
       <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
         <button
           onClick={() => handleVote("up")}
@@ -150,7 +142,6 @@ export const QueueItem = React.memo(function QueueItem({ song, isCurrent, roomId
         </button>
       </div>
 
-      {/* Remove */}
       {canRemove && (
         <button
           onClick={() => removeTrack(song.id)}

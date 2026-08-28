@@ -1,10 +1,5 @@
 "use client";
 
-/**
- * React-Query hooks for room REST data.
- * All toast notifications live here so components stay clean.
- */
-
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -17,14 +12,10 @@ function msg(err: unknown, fallback: string): string {
   );
 }
 
-// ── Query keys ────────────────────────────────────────────────────────────────
-
 export const roomKeys = {
   detail: (id: string) => ["room", id] as const,
   queue: (id: string) => ["room", id, "queue"] as const,
 };
-
-// ── Queries ───────────────────────────────────────────────────────────────────
 
 export function useRoomDetails(roomId: string) {
   return useQuery({
@@ -39,11 +30,9 @@ export function useQueue(roomId: string) {
   return useQuery({
     queryKey: roomKeys.queue(roomId),
     queryFn: () => roomService.getQueue(roomId),
-    staleTime: Infinity, // WebSockets handle live updates, no polling needed
+    staleTime: Infinity,
   });
 }
-
-// ── Mutations ─────────────────────────────────────────────────────────────────
 
 export function useAddTrack(roomId: string) {
   const qc = useQueryClient();
@@ -95,7 +84,6 @@ export function useVoteTrack(roomId: string) {
       voteType: "up" | "down" | "remove";
     }) => roomService.voteTrack(roomId, songId, voteType),
     
-    // 1. Optimistic update — happens instantly on click
     onMutate: async (variables) => {
       await qc.cancelQueries({ queryKey: roomKeys.queue(roomId) });
       const previousState = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
@@ -104,7 +92,6 @@ export function useVoteTrack(roomId: string) {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
 
-          // Compute optimistic deltas
           let newSongs = prev.songs.map((s) => {
             if (s.id !== variables.songId) return s;
             const prevVote = s.userVote;
@@ -119,9 +106,6 @@ export function useVoteTrack(roomId: string) {
             };
           });
 
-          // We no longer automatically re-sort on every vote. 
-          // The song just updates its score in place.
-          // Sorting is now a manual admin action.
           newSongs.sort((a, b) => a.position - b.position);
 
           return { ...prev, songs: newSongs };
@@ -131,7 +115,6 @@ export function useVoteTrack(roomId: string) {
       return { previousState };
     },
 
-    // 2. Revert on failure
     onError: (err, variables, context) => {
       if (context?.previousState) {
         qc.setQueryData(roomKeys.queue(roomId), context.previousState);
@@ -146,7 +129,6 @@ export function useSortQueueByVotes(roomId: string) {
   return useMutation({
     mutationFn: () => roomService.sortQueueByVotes(roomId),
     onSuccess: () => {
-      // Invalidate so we pull the newly sorted list directly from the server.
       qc.invalidateQueries({ queryKey: roomKeys.queue(roomId) });
       toast.success(`Queue sorted by votes.`);
     },

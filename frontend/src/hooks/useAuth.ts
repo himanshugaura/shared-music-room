@@ -131,7 +131,6 @@ export const useUpdateProfile = () => {
   });
 };
 
-/** Check if a username is available. Returns { available, message }. Never throws. */
 export async function checkUsernameAvailable(
   username: string
 ): Promise<{ available: boolean; message: string }> {

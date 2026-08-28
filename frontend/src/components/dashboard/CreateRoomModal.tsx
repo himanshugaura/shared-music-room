@@ -36,7 +36,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
     }
   }, [open, reset]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -86,7 +85,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
           animation: "slideUp 0.2s ease",
         }}
       >
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#eceff4" }}>Create a room</h2>
@@ -104,7 +102,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }} noValidate>
-          {/* Room name */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label htmlFor="cr-name" style={{ fontSize: 12, fontWeight: 500, color: "#d8dee9" }}>
               Room name <span style={{ color: "#bf616a" }}>*</span>
@@ -124,7 +121,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
             />
           </div>
 
-          {/* Description */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label htmlFor="cr-desc" style={{ fontSize: 12, fontWeight: 500, color: "#d8dee9" }}>
               Description <span style={{ fontSize: 11, color: "#6b7a8d", fontWeight: 400 }}>(optional)</span>
@@ -143,7 +139,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
             />
           </div>
 
-          {/* Visibility */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 500, color: "#d8dee9" }}>Visibility</span>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -177,7 +172,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
             </div>
           </div>
 
-          {/* Shuffle toggle */}
           <label
             htmlFor="cr-shuffle"
             style={{
@@ -203,7 +197,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
             </div>
           </label>
 
-          {/* Name validation error (client-side only) */}
           {nameError && (
             <p style={{ margin: 0, fontSize: 12, color: "#bf616a", display: "flex", alignItems: "center", gap: 6 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -213,7 +206,6 @@ export default function CreateRoomModal({ open, onClose }: Props) {
             </p>
           )}
 
-          {/* Actions */}
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <button type="button" onClick={onClose}
               style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#6b7a8d", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s" }}

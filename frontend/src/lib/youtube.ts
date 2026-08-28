@@ -1,11 +1,5 @@
 "use client";
 
-/**
- * Shared YouTube IFrame API loader.
- * Module-level state ensures the <script> tag is only injected once,
- * even if multiple components call ensureYTApi simultaneously.
- */
-
 let _ready = false;
 const _pending: Array<() => void> = [];
 
@@ -20,7 +14,7 @@ export function ensureYTApi(cb: () => void): void {
       _ready = true;
       _pending.forEach((f) => f());
       _pending.length = 0;
-      prev?.(); // Don't stomp other listeners
+      prev?.();
     };
     const s = document.createElement("script");
     s.src = "https://www.youtube.com/iframe_api";

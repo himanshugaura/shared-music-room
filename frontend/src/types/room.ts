@@ -32,8 +32,6 @@ export interface CreateRoomPayload {
   shuffleEnabled?: boolean;
 }
 
-// ── Queue ──────────────────────────────────────────────────────────────────
-
 export interface QueueSong {
   id: string;
   queueId: string;

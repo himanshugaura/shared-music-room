@@ -13,9 +13,7 @@ export default function GoogleOAuthButton() {
       googleAuth(code);
     },
 
-    onError: () => {
-      // Handled by useGoogleAuth onError (toast)
-    },
+    onError: () => {},
   });
 
   return (

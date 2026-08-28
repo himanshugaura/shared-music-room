@@ -1,9 +1,3 @@
-/**
- * youtube.ts — YouTube IFrame API types, usable as both:
- *  - an importable interface: `import type { YTPlayer } from "@/types/youtube"`
- *  - a global ambient declaration (via tsconfig includes or triple-slash)
- */
-
 export interface YTPlayer {
   loadVideoById(params: { videoId: string; startSeconds?: number }): void;
   cueVideoById(params: { videoId: string; startSeconds?: number }): void;

@@ -70,7 +70,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
     setMounted(true);
   }, []);
 
-  // Close on Escape key
   useEffect(() => {
     if (!open) return;
     function handleKeyDown(e: KeyboardEvent) {
@@ -80,7 +79,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onClose]);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
@@ -133,7 +131,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
           animation: "modalFadeIn 0.15s ease-out",
         }}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -198,7 +195,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
           </button>
         </div>
 
-        {/* Search if > 4 listeners */}
         {onlineUsers.length > 4 && (
           <div style={{ padding: "12px 16px 8px", flexShrink: 0 }}>
             <input
@@ -220,7 +216,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
           </div>
         )}
 
-        {/* Users list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
           {filtered.length === 0 ? (
             <p style={{ margin: 0, padding: "28px 0", textAlign: "center", color: "#6b7a8d", fontSize: 13 }}>
@@ -246,7 +241,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
                     transition: "background 0.15s",
                   }}
                 >
-                  {/* Left: Avatar with green active dot */}
                   <div style={{ position: "relative", flexShrink: 0 }}>
                     <UserAvatar user={u} size={38} />
                     <span
@@ -263,7 +257,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
                     />
                   </div>
 
-                  {/* Middle: Name and Username */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p
                       style={{
@@ -294,7 +287,6 @@ export function OnlineUsersModal({ open, onClose, onlineUsers, ownerId, currentU
                     )}
                   </div>
 
-                  {/* Right: Badges */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     {isYou && (
                       <span

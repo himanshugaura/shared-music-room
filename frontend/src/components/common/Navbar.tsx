@@ -83,7 +83,6 @@ export default function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     if (!dropdownOpen) return;
     function handleOutside(e: MouseEvent) {
@@ -101,18 +100,14 @@ export default function Navbar() {
         className="w-full max-w-5xl flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 glass rounded-2xl border border-white/[0.07]"
         aria-label="Main navigation"
       >
-        {/* Logo */}
         <Link href="/" className="flex items-center gap-2 focus-visible:outline-none">
           <span className={`${glitchFont.className} text-xl sm:text-2xl`}>Echo</span>
         </Link>
 
-        {/* Right side */}
         {isHydrated && (
           <div className="flex items-center gap-2">
             {user ? (
-              /* ── Logged-in ── */
               <>
-                {/* Dashboard button */}
                 <Link
                   href="/dashboard"
                   id="nav-dashboard"
@@ -121,7 +116,6 @@ export default function Navbar() {
                   Dashboard
                 </Link>
 
-                {/* Avatar + dropdown */}
                 <div ref={dropdownRef} style={{ position: "relative" }}>
                   <button
                     id="nav-avatar-btn"
@@ -156,7 +150,6 @@ export default function Navbar() {
                       username={user.username}
                       email={user.email ?? undefined}
                     />
-                    {/* Chevron */}
                     <svg
                       width="12"
                       height="12"
@@ -176,7 +169,6 @@ export default function Navbar() {
                     </svg>
                   </button>
 
-                  {/* Dropdown menu */}
                   {dropdownOpen && (
                     <div
                       role="menu"
@@ -196,7 +188,6 @@ export default function Navbar() {
                         animation: "dropdownFadeIn 0.15s ease",
                       }}
                     >
-                      {/* User info header */}
                       <div
                         style={{
                           padding: "8px 12px 10px",
@@ -212,7 +203,6 @@ export default function Navbar() {
                         </p>
                       </div>
 
-                      {/* Profile option */}
                       <Link
                         href="/profile"
                         id="dropdown-profile"
@@ -243,7 +233,6 @@ export default function Navbar() {
                         Profile
                       </Link>
 
-                      {/* Logout option */}
                       <button
                         id="dropdown-logout"
                         type="button"
@@ -286,7 +275,6 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-              /* ── Guest ── */
               <>
                 <Link
                   href="/login"

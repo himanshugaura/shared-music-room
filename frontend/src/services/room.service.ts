@@ -12,7 +12,6 @@ import type {
 const BASE = `${process.env.NEXT_PUBLIC_BASE_URL}/api`;
 
 export const roomService = {
-  // ── Dashboard ─────────────────────────────────────────────────────────────
   getOwnedRooms: async (): Promise<RoomSummary[]> => {
     const { data } = await api.get(`${BASE}/user/me/rooms/owned`);
     return data.data;
@@ -49,7 +48,6 @@ export const roomService = {
     return data.data;
   },
 
-  // ── Room page ─────────────────────────────────────────────────────────────
   getRoom: async (roomId: string): Promise<Room> => {
     const { data } = await api.get(`${BASE}/rooms/${roomId}`);
     return data.data;

@@ -74,7 +74,6 @@ export default function JoinRoomModal({ open, onClose }: Props) {
           animation: "slideUp 0.2s ease",
         }}
       >
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#eceff4" }}>Join a room</h2>
@@ -91,7 +90,6 @@ export default function JoinRoomModal({ open, onClose }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }} noValidate>
-          {/* Code input */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label htmlFor="jr-code" style={{ fontSize: 12, fontWeight: 500, color: "#d8dee9" }}>Room code</label>
             <input
@@ -119,7 +117,6 @@ export default function JoinRoomModal({ open, onClose }: Props) {
             />
           </div>
 
-          {/* Code validation error (client-side only) */}
           {codeError && (
             <p style={{ margin: 0, fontSize: 12, color: "#bf616a", display: "flex", alignItems: "center", gap: 6 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -129,7 +126,6 @@ export default function JoinRoomModal({ open, onClose }: Props) {
             </p>
           )}
 
-          {/* Actions */}
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <button type="button" onClick={onClose}
               style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#6b7a8d", fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s" }}

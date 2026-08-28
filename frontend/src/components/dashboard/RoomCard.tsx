@@ -26,7 +26,7 @@ function VisibilityBadge({ visibility }: { visibility: string }) {
       {isPublic ? (
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z" />
         </svg>
       ) : (
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -88,7 +88,6 @@ export default function RoomCard({ room, isOwner = false, isJoined = false, onEn
         (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
       }}
     >
-      {/* Top row */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#eceff4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -101,7 +100,6 @@ export default function RoomCard({ room, isOwner = false, isJoined = false, onEn
         <VisibilityBadge visibility={room.visibility} />
       </div>
 
-      {/* Room code */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 11, color: "#6b7a8d" }}>Code</span>
         <code
@@ -121,7 +119,6 @@ export default function RoomCard({ room, isOwner = false, isJoined = false, onEn
         </code>
       </div>
 
-      {/* Actions */}
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         <button
           id={`enter-room-${room.id}`}

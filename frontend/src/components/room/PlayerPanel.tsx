@@ -1,31 +1,15 @@
 "use client";
 
-/**
- * PlayerPanel — YouTube embed + owner-only playback controls.
- *
- * The YT IFrame API is loaded once globally (module-level guard).
- * Player controls (play/pause/seek/skip) are rendered exclusively for owners.
- * Members see only the embed and current-song info.
- *
- * Imperative control is exposed via `controlRef` so the parent (RoomPage) can
- * call play/pause/seek/loadVideo in response to socket events without prop-
- * drilling callbacks back up.
- */
-
 import {
   useCallback,
   useEffect,
   useRef,
   useState,
-  forwardRef,
-  useImperativeHandle,
 } from "react";
 import type { QueueSong, QueueState } from "@/types/room";
 import type { YTPlayer } from "@/types/youtube";
 import type { SkipVoteState } from "@/hooks/useRoomSocket";
 import { ensureYTApi } from "@/lib/youtube";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtSec(sec: number) {
   const s = Math.max(0, Math.floor(sec));
@@ -41,8 +25,6 @@ function disableCaptions(player: YTPlayer | null) {
     p.setOption?.("captions", "track", {});
   } catch {}
 }
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface PlayerControls {
   play: () => void;
@@ -67,8 +49,6 @@ interface Props {
   onVoteSkip?: () => void;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function PlayerPanel({
   currentSong,
   queueState,
@@ -86,7 +66,6 @@ export function PlayerPanel({
   const playerContainerId = "yt-main-player";
   const ytRef = useRef<YTPlayer | null>(null);
 
-  // Local state for controls
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -107,15 +86,7 @@ export function PlayerPanel({
     }
   }, [currentSong?.id, currentSong?.durationMs]);
 
-  /**
-   * Pending position sync: set when loadVideo is called with autoplay=true.
-   * On the first PLAYING state-change after the load (which fires *after*
-   * buffering completes), we seek to positionMs + elapsed so the video lands
-   * at exactly the right spot regardless of how long buffering took.
-   */
   const pendingSyncRef = useRef<{ positionMs: number; requestedAt: number } | null>(null);
-
-  // ── Init YouTube player ───────────────────────────────────────────────────
 
   useEffect(() => {
     let player: YTPlayer;
@@ -154,14 +125,12 @@ export function PlayerPanel({
               setDuration(ytRef.current?.getDuration() ?? 0);
               disableCaptions(ytRef.current);
 
-              // ── Corrective seek after buffering ──────────────────────
               if (pendingSyncRef.current) {
                 const { positionMs, requestedAt } = pendingSyncRef.current;
-                pendingSyncRef.current = null; // consume — only run once per load
+                pendingSyncRef.current = null;
                 const elapsedMs = Date.now() - requestedAt;
                 const targetSec = Math.max(0, (positionMs + elapsedMs) / 1000);
 
-                // Snap clean start to 0:00 if near the start (< 2s)
                 if (targetSec < 2) {
                   setCurrentSec(0);
                 } else {
@@ -192,8 +161,6 @@ export function PlayerPanel({
     };
   }, []);
 
-  // ── Progress ticker ───────────────────────────────────────────────────────
-
   useEffect(() => {
     if (isPlaying && !isDragging) {
       intervalRef.current = setInterval(() => {
@@ -206,8 +173,6 @@ export function PlayerPanel({
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isPlaying, isDragging]);
 
-  // ── Expose imperative controls to parent (for socket events) ─────────────
-
   useEffect(() => {
     controlRef.current = {
       play: () => { ytRef.current?.playVideo(); },
@@ -216,15 +181,13 @@ export function PlayerPanel({
       getCurrentTime: () => ytRef.current?.getCurrentTime() ?? 0,
       loadVideo: (videoId, startSeconds = 0, autoplay = true) => {
         if (autoplay) {
-          // Record intent before calling the API so requestedAt is as close
-          // as possible to the actual network request being made.
           pendingSyncRef.current = {
             positionMs: startSeconds * 1000,
             requestedAt: Date.now(),
           };
           ytRef.current?.loadVideoById({ videoId, startSeconds });
         } else {
-          pendingSyncRef.current = null; // cued videos don't need correction
+          pendingSyncRef.current = null;
           ytRef.current?.cueVideoById({ videoId, startSeconds });
         }
         disableCaptions(ytRef.current);
@@ -233,8 +196,6 @@ export function PlayerPanel({
     };
     return () => { controlRef.current = null; };
   }, [controlRef]);
-
-  // ── Owner control handlers ────────────────────────────────────────────────
 
   const handlePlayPause = useCallback(() => {
     if (!ytRef.current) return;
@@ -277,14 +238,11 @@ export function PlayerPanel({
         background: "#0b0f16",
       }}
     >
-      {/* ── YouTube embed ─────────────────────────────────────────────── */}
       <div style={{ position: "relative", flex: 1, background: "#000", minHeight: 0 }}>
-        {/* Isolated container to prevent React DOM errors when YT replaces the child */}
         <div style={{ width: "100%", height: "100%", pointerEvents: "none" }}>
           <div id={playerContainerId} style={{ width: "100%", height: "100%" }} />
         </div>
 
-        {/* Empty-state overlay */}
         {!currentSong && (
           <div
             style={{
@@ -319,7 +277,6 @@ export function PlayerPanel({
           </div>
         )}
 
-        {/* Buffering spinner */}
         {buffering && currentSong && (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
             <svg className="animate-spin" width="36" height="36" viewBox="0 0 24 24" fill="none">
@@ -330,7 +287,6 @@ export function PlayerPanel({
         )}
       </div>
 
-      {/* ── Now-playing info + owner controls ──────────────────────────── */}
       <div
         style={{
           flexShrink: 0,
@@ -339,7 +295,6 @@ export function PlayerPanel({
           background: "rgba(13,17,23,0.95)",
         }}
       >
-        {/* Song info */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isOwner ? 16 : 0 }}>
           {currentSong?.thumbnail && (
             <img src={currentSong.thumbnail} alt="" width={44} height={33}
@@ -366,13 +321,10 @@ export function PlayerPanel({
           </div>
         </div>
 
-        {/* Owner-only controls */}
         {isOwner ? (
           <>
-            {/* Seek bar */}
             <div style={{ marginBottom: 14, position: "relative" }}>
               <div style={{ position: "relative", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.1)", cursor: "pointer" }}>
-                {/* Filled track */}
                 <div style={{
                   position: "absolute", left: 0, top: 0, bottom: 0,
                   width: `${progress * 100}%`,
@@ -380,7 +332,6 @@ export function PlayerPanel({
                   background: "linear-gradient(90deg, #a3be8c, #8faa78)",
                   pointerEvents: "none",
                 }} />
-                {/* Thumb */}
                 <div style={{
                   position: "absolute",
                   left: `${progress * 100}%`,
@@ -392,7 +343,6 @@ export function PlayerPanel({
                   pointerEvents: "none",
                   transition: isDragging ? "none" : "left 0.1s",
                 }} />
-                {/* Invisible full-width range input on top */}
                 <input
                   type="range"
                   min={0}
@@ -416,9 +366,7 @@ export function PlayerPanel({
               </div>
             </div>
 
-            {/* Playback buttons */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-              {/* Play / Pause */}
               <button
                 onClick={handlePlayPause}
                 disabled={!currentSong}
@@ -448,7 +396,6 @@ export function PlayerPanel({
                 )}
               </button>
 
-              {/* Skip */}
               <button
                 onClick={onSkip}
                 disabled={!currentSong}
@@ -472,7 +419,6 @@ export function PlayerPanel({
               </button>
             </div>
 
-            {/* Owner Vote to Skip button */}
             {currentSong && (
               <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
                 <button
@@ -537,7 +483,6 @@ export function PlayerPanel({
           </>
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
-            {/* Mute Button for members */}
             <button
               onClick={handleToggleMute}
               title={isMuted ? "Unmute" : "Mute"}
@@ -568,7 +513,6 @@ export function PlayerPanel({
               )}
             </button>
 
-            {/* Vote to Skip Button */}
             {currentSong && (
               <button
                 onClick={onVoteSkip}

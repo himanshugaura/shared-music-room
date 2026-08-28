@@ -11,7 +11,6 @@ import CreateRoomModal from "../../components/dashboard/CreateRoomModal";
 import JoinRoomModal from "../../components/dashboard/JoinRoomModal";
 import type { RoomSummary } from "@/types/room";
 
-/* ── Skeleton loader ────────────────────────────────────────────────── */
 function RoomSkeleton() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 16 }}>
@@ -30,7 +29,6 @@ function RoomSkeleton() {
   );
 }
 
-/* ── Empty state ────────────────────────────────────────────────────── */
 function EmptyState({ type, onAction }: { type: "owned" | "joined"; onAction: () => void }) {
   const isOwned = type === "owned";
   return (
@@ -61,7 +59,6 @@ function EmptyState({ type, onAction }: { type: "owned" | "joined"; onAction: ()
   );
 }
 
-/* ── Main dashboard ─────────────────────────────────────────────────── */
 type Tab = "owned" | "joined";
 
 export default function DashboardPage() {
@@ -86,7 +83,6 @@ export default function DashboardPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0b0f16", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Ambient glows */}
       <div aria-hidden="true" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-5%", right: "-5%", width: 600, height: 600, background: "radial-gradient(ellipse at center, rgba(163,190,140,0.06) 0%, transparent 65%)", filter: "blur(60px)" }} />
         <div style={{ position: "absolute", bottom: "10%", left: "-8%", width: 500, height: 500, background: "radial-gradient(ellipse at center, rgba(143,188,187,0.05) 0%, transparent 65%)", filter: "blur(60px)" }} />
@@ -96,7 +92,6 @@ export default function DashboardPage() {
 
       <main style={{ position: "relative", zIndex: 1, maxWidth: 1000, margin: "0 auto", padding: "100px 16px 80px" }} className="dashboard-main">
 
-        {/* Page header */}
         <div style={{ marginBottom: 28, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }} className="dashboard-header">
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#eceff4", letterSpacing: "-0.02em" }}>
@@ -107,7 +102,6 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Action buttons */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} className="dashboard-actions">
             <button
               id="explore-rooms-btn"
@@ -172,7 +166,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tabs */}
         <div
           style={{
             display: "flex", gap: 4, marginBottom: 24,
@@ -225,7 +218,6 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* Content */}
         {isLoading && <RoomSkeleton />}
 
         {isError && !isLoading && (
@@ -256,7 +248,6 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* Modals */}
       <CreateRoomModal open={createOpen} onClose={() => setCreateOpen(false)} />
       <JoinRoomModal open={joinOpen} onClose={() => setJoinOpen(false)} />
 

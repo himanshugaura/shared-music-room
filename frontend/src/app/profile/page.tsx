@@ -5,14 +5,10 @@ import Navbar from "@/components/common/Navbar";
 import { useMe, useUpdateProfile, useLogout, checkUsernameAvailable } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store";
 
-/* ─── Constants ─────────────────────────────────────────────────────── */
-
 const USERNAME_DEBOUNCE_MS = 500;
 const USERNAME_MIN = 3;
 const USERNAME_MAX = 30;
 const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
-
-/* ─── Helpers ───────────────────────────────────────────────────────── */
 
 function Spinner({ color = "#0f1117", size = 16 }: { color?: string; size?: number }) {
   return (
@@ -23,7 +19,6 @@ function Spinner({ color = "#0f1117", size = 16 }: { color?: string; size?: numb
   );
 }
 
-/** Validate username client-side, returns error string or "" */
 function validateUsernameLocally(value: string): string {
   if (!value) return "";
   if (value.length < USERNAME_MIN) return `At least ${USERNAME_MIN} characters`;
@@ -31,8 +26,6 @@ function validateUsernameLocally(value: string): string {
   if (!USERNAME_REGEX.test(value)) return "Only letters, numbers and underscores";
   return "";
 }
-
-/* ─── Small UI pieces ───────────────────────────────────────────────── */
 
 function SectionCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
@@ -136,8 +129,6 @@ function AvatarEditor({
   );
 }
 
-/* ─── Username field with debounce check ────────────────────────────── */
-
 type UsernameStatus =
   | { state: "idle" }
   | { state: "checking" }
@@ -159,12 +150,10 @@ function UsernameField({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestValue = useRef(value);
 
-  // Check availability with debounce
   const scheduleCheck = useCallback(
     (val: string) => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-      // Already same as current saved username — skip check
       if (val === currentUsername) {
         const next: UsernameStatus = { state: "idle" };
         setStatus(next);
@@ -180,15 +169,14 @@ function UsernameField({
         return;
       }
 
-      // Show checking state immediately
       const checking: UsernameStatus = { state: "checking" };
       setStatus(checking);
       onChange(val, checking);
 
       debounceTimer.current = setTimeout(async () => {
-        if (latestValue.current !== val) return; // stale, skip
+        if (latestValue.current !== val) return;
         const result = await checkUsernameAvailable(val);
-        if (latestValue.current !== val) return; // stale after await
+        if (latestValue.current !== val) return;
         const next: UsernameStatus = result.available
           ? { state: "available" }
           : { state: "taken", message: result.message };
@@ -205,7 +193,6 @@ function UsernameField({
     scheduleCheck(raw);
   }
 
-  // Border color based on status
   const borderColor = (() => {
     if (!value) return focused ? "rgba(163,190,140,0.45)" : "rgba(255,255,255,0.08)";
     if (status.state === "invalid" || status.state === "taken")
@@ -222,7 +209,6 @@ function UsernameField({
     return "0 0 0 3px rgba(163,190,140,0.07)";
   })();
 
-  // Trailing status icon/text
   const trailingEl = (() => {
     if (!value) return null;
     if (status.state === "checking")
@@ -317,8 +303,6 @@ function UsernameField({
   );
 }
 
-/* ─── Simple text input ─────────────────────────────────────────────── */
-
 function InputField({
   id, label, value, onChange, placeholder, disabled = false, prefix,
 }: {
@@ -367,8 +351,6 @@ function InputField({
   );
 }
 
-/* ─── Main page ─────────────────────────────────────────────────────── */
-
 export default function ProfilePage() {
   useMe();
 
@@ -402,7 +384,6 @@ export default function ProfilePage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Block submit if username is being checked or is invalid/taken
     if (usernameStatus.state === "checking" || usernameStatus.state === "taken" || usernameStatus.state === "invalid") return;
 
     const formData = new FormData();
@@ -433,7 +414,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen w-full" style={{ background: "#0b0f16", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {/* Ambient glows */}
       <div aria-hidden="true" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
         <div style={{ position: "absolute", top: "-10%", right: "-5%", width: "600px", height: "600px", background: "radial-gradient(ellipse at center, rgba(163,190,140,0.06) 0%, transparent 65%)", filter: "blur(60px)" }} />
         <div style={{ position: "absolute", bottom: "5%", left: "-8%", width: "500px", height: "500px", background: "radial-gradient(ellipse at center, rgba(143,188,187,0.05) 0%, transparent 65%)", filter: "blur(60px)" }} />
@@ -453,7 +433,6 @@ export default function ProfilePage() {
           alignItems: "start",
         }}
       >
-        {/* ── Sidebar ── */}
         <aside>
           <div
             style={{
@@ -465,7 +444,6 @@ export default function ProfilePage() {
               gap: "10px", textAlign: "center",
             }}
           >
-            {/* Mini avatar */}
             <div
               style={{
                 width: "56px", height: "56px", borderRadius: "50%",
@@ -509,12 +487,10 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Nav */}
           <div style={{ marginTop: "12px", background: "rgba(22,27,34,0.6)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "14px", padding: "8px" }}>
             <p style={{ margin: "0 0 4px", padding: "4px 8px", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", color: "rgba(107,122,141,0.7)", textTransform: "uppercase" }}>
               Settings
             </p>
-            {/* Account — active */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", borderRadius: "10px", background: "rgba(163,190,140,0.12)", color: "#a3be8c", fontWeight: 600, fontSize: "14px" }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -526,7 +502,6 @@ export default function ProfilePage() {
           </div>
         </aside>
 
-        {/* ── Content ── */}
         <div>
           <div style={{ marginBottom: "24px" }}>
             <h1 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 700, color: "#eceff4", letterSpacing: "-0.02em" }}>
@@ -538,8 +513,6 @@ export default function ProfilePage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-            {/* Avatar card */}
             <SectionCard>
               <SectionHeader title="Profile photo" description="Shown on your public profile and in rooms." />
               <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "20px" }}>
@@ -586,7 +559,6 @@ export default function ProfilePage() {
               </div>
             </SectionCard>
 
-            {/* Personal info card */}
             <SectionCard>
               <SectionHeader title="Personal information" />
               <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -604,12 +576,8 @@ export default function ProfilePage() {
                     currentUsername={user?.username}
                   />
                 </div>
-
               </div>
 
-
-
-              {/* Card footer */}
               <div style={{ padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "flex-end" }}>
                 <button
                   id="profile-save-btn"

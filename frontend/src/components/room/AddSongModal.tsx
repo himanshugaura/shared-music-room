@@ -9,8 +9,6 @@ import { useAddTrack } from "@/hooks/useRoom";
 import type { YTPlayer } from "@/types/youtube";
 import { ensureYTApi } from "@/lib/youtube";
 
-// ── YouTube URL helpers ───────────────────────────────────────────────────────
-
 function extractVideoId(input: string): string | null {
   const patterns = [
     /[?&]v=([a-zA-Z0-9_-]{11})/,
@@ -25,10 +23,6 @@ function extractVideoId(input: string): string | null {
   return null;
 }
 
-
-
-// ── YouTube Data API v3 search ────────────────────────────────────────────────
-
 const YT_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY!;
 const YT_API_BASE = "https://www.googleapis.com/youtube/v3";
 
@@ -40,7 +34,6 @@ interface SearchResult {
   durationSec: number;
 }
 
-/** Parse ISO 8601 duration (PT3M45S) → seconds */
 function parseDuration(iso: string): number {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!m) return 0;
@@ -48,7 +41,6 @@ function parseDuration(iso: string): number {
 }
 
 async function searchYouTube(query: string): Promise<SearchResult[]> {
-  // 1) search — get video IDs + basic snippet
   const searchRes = await fetch(
     `${YT_API_BASE}/search?part=snippet&type=video&videoCategoryId=10&maxResults=12` +
     `&q=${encodeURIComponent(query)}&key=${YT_API_KEY}`
@@ -61,7 +53,6 @@ async function searchYouTube(query: string): Promise<SearchResult[]> {
 
   const ids = items.map((i) => i.id.videoId).join(",");
 
-  // 2) videos — get contentDetails for duration
   const detailRes = await fetch(
     `${YT_API_BASE}/videos?part=contentDetails&id=${ids}&key=${YT_API_KEY}`
   );
@@ -84,8 +75,6 @@ async function searchYouTube(query: string): Promise<SearchResult[]> {
   }));
 }
 
-// ── Misc formatters ───────────────────────────────────────────────────────────
-
 function fmtSec(s: number): string {
   const m = Math.floor(s / 60);
   return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -95,14 +84,8 @@ function destroyYTPlayer(player: Partial<YTPlayer> | null): void {
   if (typeof player?.destroy !== "function") return;
   try {
     player.destroy();
-  } catch {
-    // The iframe may already be gone when React hides the modal.
-  }
+  } catch {}
 }
-
-
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
   roomId: string;
@@ -111,7 +94,6 @@ interface Props {
 }
 
 export function AddSongModal({ roomId, open, onClose }: Props) {
-  // ── State ───────────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -130,7 +112,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
   const playerRef = useRef<Partial<YTPlayer> | null>(null);
   const { mutate: addTrack, isPending: adding } = useAddTrack(roomId);
 
-  // ── Reset on open/close ─────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -139,7 +120,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
     };
   }, []);
 
-  // ── Preview YT player ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedVideo?.videoId || !open) return;
 
@@ -184,7 +164,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
             );
           },
           onStateChange: ({ data, target }) => {
-            // YT.PlayerState.CUED = 5, fired when the preview video is ready.
             if (data === 5) {
               const dur = target.getDuration();
               setPreviewLoading(false);
@@ -205,14 +184,12 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
     };
   }, [selectedVideo?.videoId, open]);
 
-  // ── Input handler ────────────────────────────────────────────────────────────
   function handleInput(val: string) {
     setQuery(val);
     setSearchError(null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    // Direct URL or video ID
     const videoId = extractVideoId(val);
     if (videoId) {
       setResults([]);
@@ -221,7 +198,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
       return;
     }
 
-    // Empty
     if (!val.trim()) {
       setResults([]);
       setSearching(false);
@@ -229,7 +205,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
       return;
     }
 
-    // Text search (debounced 1200 ms to save API quota)
     setSearching(true);
     debounceRef.current = setTimeout(() => {
       performSearch(val.trim());
@@ -309,7 +284,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
           overflow: "hidden",
         }}
       >
-        {/* ── Header ──────────────────────────────────────────────────────── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {selectedVideo?.fromSearch && (
@@ -334,7 +308,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
           </button>
         </div>
 
-        {/* ── Search input (always visible when no video selected) ─────────── */}
         {!selectedVideo && (
           <div style={{ padding: "16px 20px 12px", flexShrink: 0 }}>
             <div style={{ position: "relative" }}>
@@ -377,10 +350,8 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
           </div>
         )}
 
-        {/* ── Results list ─────────────────────────────────────────────────── */}
         {!selectedVideo && (
           <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 12px" }}>
-            {/* Loading */}
             {searching && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "32px 0", color: "#6b7a8d", fontSize: 13 }}>
                 <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -391,14 +362,12 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
               </div>
             )}
 
-            {/* Error */}
             {!searching && searchError && (
               <div style={{ padding: "24px 8px", textAlign: "center", color: "#6b7a8d", fontSize: 13 }}>
                 {searchError}
               </div>
             )}
 
-            {/* Empty hint */}
             {!searching && !searchError && results.length === 0 && !query && (
               <div style={{ padding: "28px 8px", textAlign: "center" }}>
                 <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 10, color: "#6b7a8d" }}>
@@ -413,7 +382,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
               </div>
             )}
 
-            {/* Results */}
             {!searching && results.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {results.map((r) => (
@@ -430,7 +398,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
                     onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)")}
                     onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
                   >
-                    {/* Thumbnail */}
                     <div style={{ position: "relative", flexShrink: 0 }}>
                       <img
                         src={r.thumbnail}
@@ -451,7 +418,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
                       )}
                     </div>
 
-                    {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{
                         margin: 0, fontSize: 13, fontWeight: 500, color: "#d8dee9",
@@ -465,7 +431,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
                       </p>
                     </div>
 
-                    {/* Add arrow */}
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7a8d" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
@@ -476,10 +441,8 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
           </div>
         )}
 
-        {/* ── Preview (video selected) ─────────────────────────────────────── */}
         {selectedVideo && (
           <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-            {/* YT player embed */}
             <div style={{ position: "relative", aspectRatio: "16/9", background: "#000", flexShrink: 0 }}>
               {previewLoading && (
                 <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", zIndex: 1 }}>
@@ -489,11 +452,9 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
                   </svg>
                 </div>
               )}
-              {/* Isolated container to prevent React DOM errors when YT replaces the child */}
               <div ref={previewHostRef} style={{ width: "100%", height: "100%" }} />
             </div>
 
-            {/* Video info */}
             <div style={{ padding: "14px 20px 0" }}>
               {selectedVideo.title ? (
                 <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#eceff4" }}>{selectedVideo.title}</p>
@@ -509,7 +470,6 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
           </div>
         )}
 
-        {/* ── Footer ──────────────────────────────────────────────────────── */}
         {selectedVideo && (
           <div style={{ display: "flex", gap: 10, padding: "14px 20px 20px", flexShrink: 0 }}>
             <button

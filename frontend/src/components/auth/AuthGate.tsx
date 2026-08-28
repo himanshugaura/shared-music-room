@@ -6,8 +6,6 @@ import { useMe } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store";
 import { isGuestOnly, isProfileSetup, isProtected } from "@/lib/routes";
 
-// ─── Loading spinner ──────────────────────────────────────────────────────────
-
 function FullScreenLoader() {
   return (
     <div
@@ -50,10 +48,7 @@ function FullScreenLoader() {
   );
 }
 
-// ─── Auth Gate ────────────────────────────────────────────────────────────────
-
 export function AuthGate({ children }: { children: ReactNode }) {
-  // Trigger the /api/user/me call — populates Zustand store and sets isHydrated
   const { isSuccess, isError } = useMe();
 
   const user = useAuthStore((s) => s.user);
@@ -63,13 +58,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Wait until the me-query has settled (either resolved or failed)
     if (!isHydrated) return;
 
     const loggedIn = !!user;
     const profileComplete = loggedIn && !!user!.username;
 
-    // ── Guest-only routes (login / signup) ──────────────────────────────────
     if (isGuestOnly(pathname)) {
       if (loggedIn && profileComplete) {
         router.replace("/dashboard");
@@ -79,8 +72,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       return;
     }
 
-    // ── Profile route (/profile) ─────────────────────────────────────────────
-    // Requires login only. Users can visit whether their profile is complete or not.
     if (isProfileSetup(pathname)) {
       if (!loggedIn) {
         router.replace("/login");
@@ -88,7 +79,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       return;
     }
 
-    // ── Protected routes ────────────────────────────────────────────────────
     if (isProtected(pathname)) {
       if (!loggedIn) {
         router.replace("/login");
@@ -97,11 +87,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }
       return;
     }
-
-    // ── Public routes (home "/") — always allowed ───────────────────────────
   }, [isHydrated, user, pathname, router]);
 
-  // Show spinner until the initial auth check is complete
   if (!isHydrated) return <FullScreenLoader />;
 
   return <>{children}</>;

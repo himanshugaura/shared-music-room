@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * useRoomSocket — wires up all Socket.IO events for a single room session.
- *
- * Responsibilities:
- *  • Join the socket room on mount / leave on unmount
- *  • Forward player events (play / pause / seek / skip) via stable callbacks
- *  • Keep the React-Query queue cache in sync when songs are added
- *  • Expose typed emit helpers for the owner's player controls
- */
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -21,13 +11,10 @@ import type { Socket } from "socket.io-client";
 import type { OnlineUser, QueueSong, QueueState } from "@/types/room";
 
 export interface RoomSocketCallbacks {
-  /** Server confirmed play; `serverAt` is server timestamp for lag correction */
   onPlay?: (serverAt: number) => void;
   onPause?: (positionMs: number) => void;
   onSeek?: (positionMs: number) => void;
-  /** nextSongId is null when queue is exhausted */
   onSkip?: (nextSongId: string | null, serverAt: number, previousSongId?: string | null) => void;
-  /** Fired when the server fast-forwarded the queue — may have skipped multiple songs */
   onSync?: (currentQueueSongId: string | null, positionMs: number, playbackStartedAt: string | null, serverAt: number) => void;
 }
 
@@ -36,8 +23,6 @@ export interface SkipVoteState {
   requiredVotes: number;
   hasVoted: boolean;
 }
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {}) {
   const qc = useQueryClient();
@@ -49,14 +34,10 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
     hasVoted: false,
   });
   
-  // Retrieve current user ID to deduplicate self-triggered optimistic events
   const currentUserId = useAuthStore((s) => s.user?.id);
 
-  // Always reference the latest callbacks without re-registering listeners
   const cbRef = useRef(callbacks);
   cbRef.current = callbacks;
-
-  // ── Join / leave ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!roomId) return;
@@ -87,8 +68,6 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       }
 
       socket.on("connect", joinRoom);
-
-      // ── Player event listeners ─────────────────────────────────────────────
 
       const onPlay = ({ at }: { at: number }) => {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
@@ -139,8 +118,6 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
         cbRef.current.onSkip?.(nextSongId, at, previousSongId);
       };
 
-      // ── Queue event listeners ──────────────────────────────────────────────
-
       const onSongAdded = ({
         song,
         autoStarted,
@@ -150,7 +127,6 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       }) => {
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
-          // Guard against duplicates (REST mutation may have appended it already)
           if (prev.songs.some((s) => s.id === song.id)) return prev;
           
           const isFirst = autoStarted ?? (!prev.currentQueueSongId || prev.songs.length === 0);
@@ -165,8 +141,6 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       };
 
       const onSongVoted = ({ song, userId }: { song: QueueSong; userId: string }) => {
-        // If we triggered this vote, our optimistic UI already handled it perfectly.
-        // Ignoring the socket event entirely prevents any possibility of flickering.
         if (userId === currentUserId) return;
 
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
@@ -194,18 +168,14 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       };
 
       const onSync = (payload: { roomId: string; isPlaying: boolean; currentQueueSongId: string | null; currentPositionMs: number; playbackStartedAt: string | null; at: number }) => {
-        // Update cache: remove all songs that were skipped (everything before the new current song).
-        // syncQueueTimeline already deleted them from Postgres, so we mirror that here.
         qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
           if (!prev) return prev;
           
           if (!payload.currentQueueSongId) {
-            // Queue exhausted
             return { ...prev, isPlaying: false, currentQueueSongId: null, songs: [], currentPositionMs: 0, playbackStartedAt: null };
           }
 
           const newIdx = prev.songs.findIndex((s) => s.id === payload.currentQueueSongId);
-          // Slice: keep from the new current song onward (the server already deleted the ones before it)
           const remainingSongs = newIdx >= 0 ? prev.songs.slice(newIdx) : prev.songs;
           
           return {
@@ -218,11 +188,8 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
           };
         });
 
-        // Delegate the actual video load to RoomPage via the onSync callback
         cbRef.current.onSync?.(payload.currentQueueSongId, payload.currentPositionMs, payload.playbackStartedAt, payload.at);
       };
-
-      // ── Member presence event listeners ────────────────────────────────────
 
       const onMemberJoined = (payload: { user: OnlineUser; roomId: string; onlineUsers?: OnlineUser[] }) => {
         if (payload.onlineUsers) {
@@ -282,8 +249,6 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
       socket.on("room:member_joined", onMemberJoined);
       socket.on("room:member_left", onMemberLeft);
 
-      // ── Cleanup ────────────────────────────────────────────────────────────
-
       return () => {
         socket.off("connect", joinRoom);
         socket.emit("room:leave", { roomId });
@@ -305,8 +270,6 @@ export function useRoomSocket(roomId: string, callbacks: RoomSocketCallbacks = {
 
     return () => { mounted = false; };
   }, [roomId, qc, currentUserId]);
-
-  // ── Owner emit helpers ────────────────────────────────────────────────────
 
   const emitPlay = useCallback(() => {
     socketRef.current?.emit("player:play", { roomId });

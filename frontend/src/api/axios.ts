@@ -68,12 +68,8 @@ api.interceptors.response.use(
     } catch (refreshError) {
       processQueue(refreshError);
 
-      // Clear local auth state
       useAuthStore.getState().clearUser();
 
-      // Only redirect to /login when on a protected route.
-      // On public/guest pages we just clear state — no hard reload
-      // (which would cause infinite loops or broken public pages).
       if (
         typeof window !== "undefined" &&
         !isPublicOrGuestPath(window.location.pathname)

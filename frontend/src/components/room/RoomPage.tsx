@@ -1,16 +1,5 @@
 "use client";
 
-/**
- * RoomPage — top-level client component for /room/[roomId].
- *
- * Responsibilities:
- *  • Fetch room details and initial queue state (REST via React-Query)
- *  • Determine owner vs member role
- *  • Wire socket events to YouTube player imperative controls
- *  • Expose typed emit helpers to PlayerPanel via callbacks
- *  • Compose RoomHeader, PlayerPanel, QueuePanel
- */
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,16 +13,11 @@ import { PlayerPanel, type PlayerControls } from "./PlayerPanel";
 import { QueuePanel } from "./QueuePanel";
 import type { QueueState } from "@/types/room";
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-/** Compute the real playback position accounting for server time offset. */
 function calcPosition(q: QueueState): number {
   if (!q.isPlaying || !q.playbackStartedAt) return q.currentPositionMs / 1000;
   const elapsed = Date.now() - new Date(q.playbackStartedAt).getTime();
   return Math.max(0, (q.currentPositionMs + elapsed) / 1000);
 }
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export function RoomPage({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -46,12 +30,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
   const isOwner = !!room && !!user && room.ownerId === user.id;
   const currentSong = queue?.songs.find((s) => s.id === queue.currentQueueSongId) ?? null;
 
-  // Ref exposing imperative player controls (set by PlayerPanel)
   const controlRef = useRef<PlayerControls | null>(null);
-
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-
-  // ── Active song sync: loads the video into YouTube player whenever the active song changes ──
 
   const loadedSongIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -65,7 +45,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
       return;
     }
 
-    // If a different song became the active song (e.g. initial load, auto-started song, or song advance)
     if (loadedSongIdRef.current !== currentSong.id) {
       loadedSongIdRef.current = currentSong.id;
       const rawPosition = calcPosition(queue!);
@@ -78,14 +57,11 @@ export function RoomPage({ roomId }: { roomId: string }) {
     }
   }, [currentSong?.id, isPlayerReady, queue?.isPlaying]);
 
-  // ── Socket event handlers ─────────────────────────────────────────────────
-
   const handleSocketPlay = useCallback((serverAt: number) => {
     const lagMs = Date.now() - serverAt;
     const freshQueue = qc.getQueryData<QueueState>(roomKeys.queue(roomId));
     const activeSong = freshQueue?.songs.find((s) => s.id === freshQueue.currentQueueSongId);
 
-    // If the active song is not currently loaded in the iframe, load it immediately
     if (activeSong && loadedSongIdRef.current !== activeSong.id) {
       loadedSongIdRef.current = activeSong.id;
       const rawPos = calcPosition(freshQueue!);
@@ -115,7 +91,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
     (nextSongId: string | null, serverAt: number, previousSongId?: string | null) => {
       const nowIso = new Date(serverAt).toISOString();
 
-      // Update queue cache — remove the song that just ended and advance currentQueueSongId with position 0.
       qc.setQueryData<QueueState>(roomKeys.queue(roomId), (prev) => {
         if (!prev) return prev;
         const currentSongId = previousSongId ?? prev.currentQueueSongId;
@@ -167,7 +142,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
     [qc, roomId]
   );
 
-  // Socket wiring
   const {
     emitPlay,
     emitPause,
@@ -185,14 +159,8 @@ export function RoomPage({ roomId }: { roomId: string }) {
     onSync: handleSocketSync,
   });
 
-  // Guard: prevents double-emit if the YouTube ENDED event fires more than once
-  // (can happen due to YT API buffering quirks or rapid seek-to-end).
   const skipInProgressRef = useRef(false);
 
-  // ── Distributed Client-Driven Auto-Skip Ticker ───────────────────────────
-  // Every client checks if the current song is past its duration.
-  // The first one to notice asks the server to sync the timeline.
-  // The server verifies the math strictly, so this is perfectly safe and robust.
   useEffect(() => {
     if (!queue || !queue.isPlaying || !currentSong) return;
 
@@ -204,7 +172,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
         : 0;
       const currentPositionMs = queue.currentPositionMs + elapsedMs;
 
-      // Give a tiny 1-second buffer past the absolute end of the song
       if (currentPositionMs > currentSong.durationMs + 1000) {
         skipInProgressRef.current = true;
         emitRequestSync();
@@ -214,8 +181,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
 
     return () => clearInterval(interval);
   }, [queue, currentSong, emitRequestSync]);
-
-  // ── Owner control handlers (emit + local player) ──────────────────────────
 
   const handlePlay = useCallback(() => {
     controlRef.current?.play();
@@ -252,14 +217,10 @@ export function RoomPage({ roomId }: { roomId: string }) {
   const handleEnded = useCallback(() => {
     if (currentSong && !skipInProgressRef.current) {
       skipInProgressRef.current = true;
-      // Tell the server the song ended. Server will verify the timeline
-      // and broadcast the next song to everyone.
       emitRequestSync();
       setTimeout(() => { skipInProgressRef.current = false; }, 5_000);
     }
   }, [currentSong, emitRequestSync]);
-
-  // ── Render states ────────────────────────────────────────────────────────
 
   if (roomLoading || queueLoading) {
     return (
@@ -315,7 +276,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
         currentUserId={user?.id}
       />
 
-      {/* Main content: player left, queue right */}
       <div
         style={{
           flex: 1,
@@ -349,7 +309,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
         />
       </div>
 
-      {/* Responsive: stack on small screens */}
       <style>{`
         @media (max-width: 768px) {
           .room-root {
@@ -363,7 +322,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
             min-height: 0 !important;
             overflow: visible !important;
           }
-          /* On mobile, give the player a fixed aspect ratio */
           .room-grid > section:first-child {
             height: auto !important;
             min-height: 0 !important;
@@ -373,7 +331,6 @@ export function RoomPage({ roomId }: { roomId: string }) {
             aspect-ratio: 16 / 9;
             min-height: 0 !important;
           }
-          /* Queue panel: no border-left, add border-top instead */
           .room-grid > aside {
             height: auto !important;
             min-height: 300px;

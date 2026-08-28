@@ -5,7 +5,6 @@ import Navbar from "@/components/common/Navbar";
 import { usePublicRooms, useJoinRoomById, useJoinedRooms, useOwnedRooms } from "@/hooks/useRooms";
 import type { RoomSummary } from "@/types/room";
 
-/* ── Skeleton loader ────────────────────────────────────────────────── */
 function RoomSkeleton() {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
@@ -24,7 +23,6 @@ function RoomSkeleton() {
   );
 }
 
-/* ── Empty state ────────────────────────────────────────────────────── */
 function EmptyState() {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", gap: 14, textAlign: "center" }}>
