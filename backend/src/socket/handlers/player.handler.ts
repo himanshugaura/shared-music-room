@@ -29,10 +29,9 @@ const assertRoomOwner = async (
 };
 
 export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket): void => {
-
   socket.on('player:play', async ({ roomId }: RoomPayload, ack?: (res: AckResponse) => void) => {
     try {
-      if (!await assertRoomOwner(roomId, socket.user.id)) {
+      if (!(await assertRoomOwner(roomId, socket.user.id))) {
         ack?.({ ok: false, message: 'Forbidden' });
         return;
       }
@@ -50,15 +49,11 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
     }
   });
 
-
   socket.on(
     'player:pause',
-    async (
-      { roomId, currentPositionMs }: PausePayload,
-      ack?: (res: AckResponse) => void,
-    ) => {
+    async ({ roomId, currentPositionMs }: PausePayload, ack?: (res: AckResponse) => void) => {
       try {
-        if (!await assertRoomOwner(roomId, socket.user.id)) {
+        if (!(await assertRoomOwner(roomId, socket.user.id))) {
           ack?.({ ok: false, message: 'Forbidden' });
           return;
         }
@@ -77,19 +72,15 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
     },
   );
 
-  //
   socket.on(
     'player:seek',
     async ({ roomId, positionMs }: SeekPayload, ack?: (res: AckResponse) => void) => {
       try {
-        if (!await assertRoomOwner(roomId, socket.user.id)) {
+        if (!(await assertRoomOwner(roomId, socket.user.id))) {
           ack?.({ ok: false, message: 'Forbidden' });
           return;
         }
 
-        // Phase 1: write to Redis immediately, broadcast to all clients, ack the admin.
-        // The BullMQ debounce (Postgres sync) is fire-and-forget inside setQueueSeek —
-        // it can never block or break the realtime broadcast.
         const found = await setQueueSeek(roomId, positionMs);
         if (!found) {
           ack?.({ ok: false, message: 'Queue not found' });
@@ -105,7 +96,6 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
     },
   );
 
-  
   socket.on(
     'player:skip',
     async (
@@ -113,7 +103,7 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
       ack?: (res: AckResponse<{ nextSongId: string | null }>) => void,
     ) => {
       try {
-        if (!await assertRoomOwner(roomId, socket.user.id)) {
+        if (!(await assertRoomOwner(roomId, socket.user.id))) {
           ack?.({ ok: false, message: 'Forbidden' });
           return;
         }
@@ -131,14 +121,13 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
 
         const nextSongId = updatedQueue?.currentQueueSongId ?? null;
 
-        // Sync Redis with the new Postgres state produced by advanceToNextSong.
         if (updatedQueue) {
           patchPlayerState(roomId, {
             isPlaying: updatedQueue.isPlaying,
             currentPositionMs: 0,
             playbackStartedAt: updatedQueue.playbackStartedAt,
             currentQueueSongId: updatedQueue.currentQueueSongId,
-          }).catch(() => {/* swallowed — non-critical */});
+          }).catch(() => {});
         }
 
         await clearSkipVotes(roomId, currentSongId);
@@ -166,7 +155,9 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
     'player:vote_skip',
     async (
       { roomId }: RoomPayload,
-      ack?: (res: AckResponse<{ hasVoted: boolean; currentVotes: number; requiredVotes: number }>) => void,
+      ack?: (
+        res: AckResponse<{ hasVoted: boolean; currentVotes: number; requiredVotes: number }>,
+      ) => void,
     ) => {
       try {
         const state = await getPlayerState(roomId);
@@ -187,7 +178,6 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
         );
 
         if (currentVotes >= requiredVotes) {
-          // Vote passed! Advance to next song
           const songWithQueue = await findSongWithQueue(songId);
           if (songWithQueue) {
             const updatedQueue = await advanceToNextSong(
@@ -226,7 +216,6 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
           }
         }
 
-        // Broadcast updated votes to the room
         io.to(roomId).emit('player:skip_votes_updated', {
           roomId,
           currentVotes,
@@ -241,40 +230,33 @@ export const registerPlayerHandlers = (io: Server, socket: AuthenticatedSocket):
     },
   );
 
-  socket.on(
-    'player:request_sync',
-    async ({ roomId }: RoomPayload) => {
-      try {
-        // Run the fast-forward algorithm.
-        // Returns the updated MusicQueue ONLY if it actually advanced (i.e. a song ended).
-        // Returns null if the song is still playing — nothing to broadcast.
-        const advanced = await syncQueueTimeline(roomId);
+  socket.on('player:request_sync', async ({ roomId }: RoomPayload) => {
+    try {
+      const advanced = await syncQueueTimeline(roomId);
 
-        if (!advanced) return; // Song still playing — do NOT emit (would cause a restart)
+      if (!advanced) return;
 
-        if (advanced.currentQueueSongId) {
-          await clearSkipVotes(roomId, advanced.currentQueueSongId);
-        }
-
-        // Broadcast the new state to every client in the room
-        io.to(roomId).emit('player:sync', {
-          roomId,
-          isPlaying: advanced.isPlaying,
-          currentQueueSongId: advanced.currentQueueSongId,
-          currentPositionMs: 0,
-          playbackStartedAt: advanced.playbackStartedAt?.toISOString() ?? null,
-          at: Date.now(),
-        });
-
-        io.to(roomId).emit('player:skip_votes_updated', {
-          roomId,
-          currentVotes: 0,
-          requiredVotes: 1,
-          userIds: [],
-        });
-      } catch (err) {
-        logger.error({ err, roomId }, 'Failed to process sync request');
+      if (advanced.currentQueueSongId) {
+        await clearSkipVotes(roomId, advanced.currentQueueSongId);
       }
+
+      io.to(roomId).emit('player:sync', {
+        roomId,
+        isPlaying: advanced.isPlaying,
+        currentQueueSongId: advanced.currentQueueSongId,
+        currentPositionMs: 0,
+        playbackStartedAt: advanced.playbackStartedAt?.toISOString() ?? null,
+        at: Date.now(),
+      });
+
+      io.to(roomId).emit('player:skip_votes_updated', {
+        roomId,
+        currentVotes: 0,
+        requiredVotes: 1,
+        userIds: [],
+      });
+    } catch (err) {
+      logger.error({ err, roomId }, 'Failed to process sync request');
     }
-  );
+  });
 };

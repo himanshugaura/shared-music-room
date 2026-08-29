@@ -1,11 +1,6 @@
 import { Router } from 'express';
 
-import {
-  createRoom,
-  deleteRoom,
-  getRoomDetails,
-  listPublicRooms,
-} from './room.controller.js';
+import { createRoom, deleteRoom, getRoomDetails, listPublicRooms } from './room.controller.js';
 import { joinRoom, joinRoomByRoomCode, leaveRoom } from '../user/user.controller.js';
 import { authMiddleware } from '../../middleware/auth.middleware.js';
 import { validate } from '../../middleware/validate.js';

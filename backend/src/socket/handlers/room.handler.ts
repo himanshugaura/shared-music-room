@@ -57,7 +57,6 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
 
         await socket.join(roomId);
 
-        // Always broadcast the updated online list to the room so all clients sync in real-time
         io.to(roomId).emit('room:online_users_updated', {
           roomId,
           onlineUsers,
@@ -65,7 +64,6 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
 
         syncSkipVotesThreshold(roomId, onlineUsers.length);
 
-        // Notify other room members if this is the user's first active socket
         if (isFirstSocket) {
           socket.to(roomId).emit('room:member_joined', {
             user: onlineUser,
@@ -81,38 +79,40 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
     },
   );
 
-  socket.on('room:leave', async ({ roomId }: RoomLeavePayload, ack?: (res: AckResponse) => void) => {
-    try {
-      const { isLastSocket, remainingUsers } = await removeRoomMember(
-        roomId,
-        socket.id,
-        socket.user.id,
-        isSocketLive,
-      );
+  socket.on(
+    'room:leave',
+    async ({ roomId }: RoomLeavePayload, ack?: (res: AckResponse) => void) => {
+      try {
+        const { isLastSocket, remainingUsers } = await removeRoomMember(
+          roomId,
+          socket.id,
+          socket.user.id,
+          isSocketLive,
+        );
 
-      await socket.leave(roomId);
+        await socket.leave(roomId);
 
-      // Always broadcast the updated online list to the room
-      io.to(roomId).emit('room:online_users_updated', {
-        roomId,
-        onlineUsers: remainingUsers,
-      });
-
-      syncSkipVotesThreshold(roomId, remainingUsers.length);
-
-      if (isLastSocket) {
-        socket.to(roomId).emit('room:member_left', {
-          userId: socket.user.id,
+        io.to(roomId).emit('room:online_users_updated', {
           roomId,
           onlineUsers: remainingUsers,
         });
-      }
 
-      ack?.({ ok: true });
-    } catch {
-      ack?.({ ok: false, message: 'Failed to leave room' });
-    }
-  });
+        syncSkipVotesThreshold(roomId, remainingUsers.length);
+
+        if (isLastSocket) {
+          socket.to(roomId).emit('room:member_left', {
+            userId: socket.user.id,
+            roomId,
+            onlineUsers: remainingUsers,
+          });
+        }
+
+        ack?.({ ok: true });
+      } catch {
+        ack?.({ ok: false, message: 'Failed to leave room' });
+      }
+    },
+  );
 
   socket.on(
     'room:get_online_users',
@@ -126,7 +126,6 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
     },
   );
 
-  // Handle unexpected socket disconnects (tab close, network drop, etc.)
   socket.on('disconnecting', async () => {
     try {
       const rooms = Array.from(socket.rooms);
@@ -155,8 +154,6 @@ export const registerRoomHandlers = (io: Server, socket: AuthenticatedSocket): v
           });
         }
       }
-    } catch {
-      // Best-effort cleanup on disconnect
-    }
+    } catch {}
   });
 };

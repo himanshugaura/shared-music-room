@@ -1,6 +1,6 @@
-import streamifier from "streamifier";
+import streamifier from 'streamifier';
 
-import cloudinary from "../config/cloudinary.js";
+import cloudinary from '../config/cloudinary.js';
 
 export const uploadAvatar = (
   fileBuffer: Buffer,
@@ -11,7 +11,7 @@ export const uploadAvatar = (
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: "shared-music-room/avatars",
+        folder: 'shared-music-room/avatars',
       },
       (error, result) => {
         if (error || !result) {
@@ -22,15 +22,13 @@ export const uploadAvatar = (
           publicId: result.public_id,
           secureUrl: result.secure_url,
         });
-      }
+      },
     );
 
     streamifier.createReadStream(fileBuffer).pipe(stream);
   });
 };
 
-export const deleteFromCloudinary = async (
-  publicId: string
-) => {
+export const deleteFromCloudinary = async (publicId: string) => {
   return cloudinary.uploader.destroy(publicId);
 };

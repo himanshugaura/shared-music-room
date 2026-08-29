@@ -1,7 +1,7 @@
 import { redis } from '../config/redis.js';
 import { redisKeys } from './keys.js';
 
-const SKIP_VOTES_TTL_SEC = 86_400; // 24 hours
+const SKIP_VOTES_TTL_SEC = 86_400;
 
 export interface SkipVoteResult {
   hasVoted: boolean;
@@ -9,9 +9,6 @@ export interface SkipVoteResult {
   userIds: string[];
 }
 
-/**
- * Toggles a user's skip vote for the current song in a room.
- */
 export const toggleSkipVote = async (
   roomId: string,
   songId: string,
@@ -44,9 +41,6 @@ export const toggleSkipVote = async (
   };
 };
 
-/**
- * Retrieves the current skip votes for a song.
- */
 export const getSkipVotes = async (
   roomId: string,
   songId: string,
@@ -59,13 +53,7 @@ export const getSkipVotes = async (
   };
 };
 
-/**
- * Clears skip votes when a track finishes or skips.
- */
-export const clearSkipVotes = async (
-  roomId: string,
-  songId: string,
-): Promise<void> => {
+export const clearSkipVotes = async (roomId: string, songId: string): Promise<void> => {
   const key = redisKeys.roomSkipVotes(roomId, songId);
   await redis.del(key);
 };

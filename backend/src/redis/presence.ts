@@ -2,7 +2,7 @@ import { redis } from '../config/redis.js';
 import { redisKeys } from './keys.js';
 import type { OnlineUser } from '../socket/types.js';
 
-const PRESENCE_TTL_SEC = 86_400; // 24 hours
+const PRESENCE_TTL_SEC = 86_400;
 
 export interface AddMemberResult {
   isFirstSocket: boolean;
@@ -16,11 +16,6 @@ export interface RemoveMemberResult {
 
 export type SocketLivenessChecker = (socketId: string) => boolean;
 
-/**
- * Adds a socket connection for a user in a room.
- * Stores user details in an in-memory hash and tracks socket IDs in a set.
- * Automatically prunes any dead socket IDs to prevent ghost users.
- */
 export const addRoomMember = async (
   roomId: string,
   socketId: string,
@@ -30,7 +25,6 @@ export const addRoomMember = async (
   const userSocketsKey = redisKeys.roomUserSockets(roomId, user.id);
   const onlineUsersKey = redisKeys.roomOnlineUsers(roomId);
 
-  // Prune any dead socket IDs for this user
   let liveSocketsBefore = 0;
   if (isSocketLive) {
     const existing = await redis.smembers(userSocketsKey);
@@ -58,10 +52,6 @@ export const addRoomMember = async (
   };
 };
 
-/**
- * Removes a socket connection for a user in a room.
- * If the user has no remaining live sockets in this room, removes them from online_users.
- */
 export const removeRoomMember = async (
   roomId: string,
   socketId: string,
@@ -73,7 +63,6 @@ export const removeRoomMember = async (
 
   await redis.srem(userSocketsKey, socketId);
 
-  // Check remaining sockets and clean up dead ones
   let remainingCount = 0;
   if (isSocketLive) {
     const existing = await redis.smembers(userSocketsKey);
@@ -99,10 +88,6 @@ export const removeRoomMember = async (
   };
 };
 
-/**
- * Retrieves all online users in a room.
- * Optionally self-heals by pruning users who have zero active sockets.
- */
 export const getOnlineUsers = async (
   roomId: string,
   isSocketLive?: SocketLivenessChecker,
@@ -125,7 +110,6 @@ export const getOnlineUsers = async (
         await redis.del(userSocketsKey);
         continue;
       } else if (liveSockets.length < sockets.length) {
-        // Prune dead sockets
         const dead = sockets.filter((id) => !isSocketLive(id));
         if (dead.length > 0) {
           await redis.srem(userSocketsKey, ...dead);
@@ -135,12 +119,9 @@ export const getOnlineUsers = async (
 
     try {
       onlineUsers.push(JSON.parse(jsonStr));
-    } catch {
-      // Ignore malformed JSON
-    }
+    } catch {}
   }
 
-  // Clean up dead users from hash
   if (deadUserIds.length > 0) {
     await redis.hdel(onlineUsersKey, ...deadUserIds);
   }

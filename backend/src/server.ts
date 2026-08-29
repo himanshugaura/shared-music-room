@@ -24,7 +24,6 @@ dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 
-// Security
 app.use(helmet());
 
 app.use(
@@ -34,18 +33,14 @@ app.use(
   }),
 );
 
-// Request logging
 app.use(pinoHttp({ logger }));
 
-// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Global rate limit
 app.use('/api', generalLimiter);
 
-// Routes
 app.use('/api', apiRouter);
 
 app.use(errorHandler);

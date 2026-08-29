@@ -25,9 +25,7 @@ const ROOM_SUMMARY_SELECT = {
 
 export type UserProfile = AuthUser & { username: string | null; createdAt: Date };
 
-export const getUserProfileById = async (
-  id: string,
-): Promise<UserProfile | null> =>
+export const getUserProfileById = async (id: string): Promise<UserProfile | null> =>
   prisma.user.findUnique({ where: { id }, select: USER_PROFILE_SELECT });
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
@@ -35,7 +33,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile> => {
     where: { id: userId },
     select: USER_PROFILE_SELECT,
   });
-  if (!user) { throw new ApiError(404, 'User not found'); }
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
   return user;
 };
 
@@ -44,7 +44,9 @@ export const checkUsernameAvailability = async (username: string): Promise<void>
     where: { username },
     select: { id: true },
   });
-  if (existing) { throw new ApiError(409, 'Username is already taken'); }
+  if (existing) {
+    throw new ApiError(409, 'Username is already taken');
+  }
 };
 
 export interface UpdateProfileInput {
@@ -61,8 +63,10 @@ export const updateUserProfile = async (
     where: { id: userId },
     select: USER_PROFILE_SELECT,
   });
-  
-  if (!current) { throw new ApiError(404, 'User not found'); }
+
+  if (!current) {
+    throw new ApiError(404, 'User not found');
+  }
 
   let avatarUrl: string | null = current.avatarUrl;
   let avatarPublicId: string | null = null;
@@ -106,7 +110,7 @@ export const getJoinedRooms = async (userId: string): Promise<JoinedRoomsRespons
     select: ROOM_SUMMARY_SELECT,
     orderBy: { createdAt: 'desc' },
   });
-  
+
   return { member };
 };
 
@@ -115,9 +119,11 @@ export const joinRoom = async (roomId: string, userId: string): Promise<void> =>
     where: { roomId_userId: { roomId, userId } },
     select: { roomId: true, userId: true },
   });
-  
-  if (existing) { throw new ApiError(409, 'You are already a member of this room'); }
-  
+
+  if (existing) {
+    throw new ApiError(409, 'You are already a member of this room');
+  }
+
   await prisma.roomMember.create({ data: { roomId, userId } });
 };
 
@@ -126,15 +132,19 @@ export const joinRoomByCode = async (roomCode: string, userId: string): Promise<
     where: { roomCode },
     select: { id: true },
   });
-  
-  if (!room) { throw new ApiError(404, 'Room not found'); }
+
+  if (!room) {
+    throw new ApiError(404, 'Room not found');
+  }
 
   const existing = await prisma.roomMember.findUnique({
     where: { roomId_userId: { roomId: room.id, userId } },
     select: { roomId: true, userId: true },
   });
-  
-  if (existing) { throw new ApiError(409, 'You are already a member of this room'); }
+
+  if (existing) {
+    throw new ApiError(409, 'You are already a member of this room');
+  }
 
   await prisma.roomMember.create({ data: { roomId: room.id, userId } });
 };
@@ -143,9 +153,11 @@ export const leaveRoom = async (roomId: string, userId: string): Promise<void> =
   const existing = await prisma.roomMember.findUnique({
     where: { roomId_userId: { roomId, userId } },
   });
-  
-  if (!existing) { throw new ApiError(404, 'You are not a member of this room'); }
-  
+
+  if (!existing) {
+    throw new ApiError(404, 'You are not a member of this room');
+  }
+
   await prisma.roomMember.delete({
     where: { roomId_userId: { roomId, userId } },
   });

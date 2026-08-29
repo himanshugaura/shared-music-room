@@ -8,10 +8,9 @@ import { verifyAccessToken } from '../utils/jwt.js';
 
 export const authMiddleware: RequestHandler = asyncHandler(async (req, _res, next) => {
   const authHeader = req.headers.authorization;
-  const token =
-    authHeader?.startsWith('Bearer ')
-      ? authHeader.slice(7)
-      : (req.cookies?.accessToken as string | undefined);
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice(7)
+    : (req.cookies?.accessToken as string | undefined);
 
   if (!token) {
     throw new ApiError(401, 'Unauthorized');

@@ -1,9 +1,5 @@
 import { rateLimit } from 'express-rate-limit';
 
-/**
- * Strict rate limiter for auth routes — prevents brute force on login/register.
- * 15 attempts per IP per 15-minute window.
- */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
@@ -16,10 +12,6 @@ export const authLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
-/**
- * General API rate limiter — loose ceiling for all other routes.
- * 200 requests per IP per 15-minute window.
- */
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,

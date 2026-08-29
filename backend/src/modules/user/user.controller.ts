@@ -28,9 +28,15 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   const { name, username } = req.body as { name?: string; username?: string };
 
   const input: UpdateProfileInput = {};
-  if (name !== undefined) { input.name = name; }
-  if (username !== undefined) { input.username = username; }
-  if (req.file !== undefined) { input.file = req.file; }
+  if (name !== undefined) {
+    input.name = name;
+  }
+  if (username !== undefined) {
+    input.username = username;
+  }
+  if (req.file !== undefined) {
+    input.file = req.file;
+  }
 
   const user = await updateUserProfile(userId!, input);
 

@@ -58,7 +58,7 @@ export const sortByVotes = asyncHandler(async (req: Request, res: Response) => {
   const { roomId } = req.params as { roomId: string };
 
   const queue = await sortQueueByVotes(roomId);
-  
+
   getIO().to(roomId).emit('queueUpdated', { roomId, queue });
 
   return new ApiResponse(200, queue, 'Queue sorted by votes').send(res);
@@ -71,9 +71,6 @@ export const voteTrack = asyncHandler(async (req: Request, res: Response) => {
 
   const song = await voteOnTrack(songId, userId, voteType);
 
-  // Broadcast just the updated song scores. 
-  // We attach userId so the sender's frontend knows to ignore this event 
-  // and trust its own optimistic UI, eliminating all flicker.
   getIO().to(roomId).emit('queue:song_voted', { song, userId });
 
   return new ApiResponse(200, song, 'Vote recorded').send(res);

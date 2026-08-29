@@ -82,9 +82,7 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     try {
       const { sessionId } = verifyRefreshToken(refreshToken);
       await logoutUser(sessionId);
-    } catch {
-      // ignore errors — still clear cookies
-    }
+    } catch {}
   }
 
   res

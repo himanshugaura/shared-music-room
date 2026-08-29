@@ -90,18 +90,23 @@ export const registerUser = async (
   return { accessToken, refreshToken, user: toAuthUser(user) };
 };
 
-export const loginUser = async (
-  username: string,
-  password: string,
-): Promise<AuthTokenResponse> => {
+export const loginUser = async (username: string, password: string): Promise<AuthTokenResponse> => {
   const user = await prisma.user.findUnique({ where: { username } });
 
-  if (!user) { throw new ApiError(401, 'Invalid credentials'); }
-  if (user.provider === 'google') { throw new ApiError(401, 'This account uses Google sign-in'); }
-  if (!user.password) { throw new ApiError(401, 'Invalid credentials'); }
+  if (!user) {
+    throw new ApiError(401, 'Invalid credentials');
+  }
+  if (user.provider === 'google') {
+    throw new ApiError(401, 'This account uses Google sign-in');
+  }
+  if (!user.password) {
+    throw new ApiError(401, 'Invalid credentials');
+  }
 
   const isValid = await argon.verify(user.password, password);
-  if (!isValid) { throw new ApiError(401, 'Invalid credentials'); }
+  if (!isValid) {
+    throw new ApiError(401, 'Invalid credentials');
+  }
 
   const { accessToken, refreshToken } = await createSessionAndTokens(user.id);
 
@@ -165,7 +170,9 @@ export const refreshTokens = async (
   const session = await prisma.refreshSession.findUnique({
     where: { id: tokenPayload.sessionId },
   });
-  if (!session) { throw new ApiError(401, 'Unauthorized'); }
+  if (!session) {
+    throw new ApiError(401, 'Unauthorized');
+  }
 
   if (session.expiresAt.getTime() <= Date.now()) {
     await prisma.refreshSession.deleteMany({ where: { id: tokenPayload.sessionId } });

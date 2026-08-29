@@ -47,10 +47,7 @@ export const createRoomService = async (input: CreateRoomInput): Promise<Room> =
       });
       break;
     } catch (error) {
-      if (
-        error instanceof PrismaClient.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof PrismaClient.PrismaClientKnownRequestError && error.code === 'P2002') {
         continue;
       }
       throw error;
@@ -76,10 +73,14 @@ export const deleteRoomService = async (roomId: string, requesterId: string): Pr
     where: { id: roomId },
     select: { id: true, ownerId: true },
   });
-  
-  if (!room) { throw new ApiError(404, 'Room not found'); }
-  if (room.ownerId !== requesterId) { throw new ApiError(403, 'Only the room owner can delete this room'); }
-  
+
+  if (!room) {
+    throw new ApiError(404, 'Room not found');
+  }
+  if (room.ownerId !== requesterId) {
+    throw new ApiError(403, 'Only the room owner can delete this room');
+  }
+
   return prisma.room.delete({ where: { id: roomId } });
 };
 

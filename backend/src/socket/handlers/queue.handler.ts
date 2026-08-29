@@ -26,7 +26,6 @@ export const registerQueueHandlers = (io: Server, socket: AuthenticatedSocket): 
 
         io.to(roomId).emit('queue:song_added', { roomId, song, autoStarted });
 
-        // First song added — tell all clients to start playing
         if (autoStarted) {
           io.to(roomId).emit('player:play', { roomId, at: Date.now() });
         }

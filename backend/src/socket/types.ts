@@ -15,6 +15,4 @@ export type AuthenticatedSocket = Socket & {
   user: SocketUser;
 };
 
-export type AckResponse<T = undefined> =
-  | { ok: true; data?: T }
-  | { ok: false; message: string };
+export type AckResponse<T = undefined> = { ok: true; data?: T } | { ok: false; message: string };

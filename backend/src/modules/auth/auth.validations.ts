@@ -7,11 +7,7 @@ export const registerBodySchema = z.object({
     .max(30, 'Username must be at most 30 characters')
     .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers and underscores')
     .trim(),
-  name: z
-    .string()
-    .min(1, 'Name is required')
-    .max(100, 'Name is too long')
-    .trim(),
+  name: z.string().min(1, 'Name is required').max(100, 'Name is too long').trim(),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')

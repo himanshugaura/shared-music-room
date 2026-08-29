@@ -7,8 +7,7 @@ const REFRESH_SECRET = env.JWT_REFRESH_SECRET;
 
 const ACCESS_TOKEN_EXPIRES_IN = '15m';
 
-/** Single source of truth for refresh token lifetime — used by both JWT exp and DB expiresAt */
-export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const REFRESH_TOKEN_TTL_SECONDS = REFRESH_TOKEN_TTL_MS / 1000;
 
 export type AccessTokenPayload = {

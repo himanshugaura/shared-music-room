@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Response } from 'express';
 
 export class ApiResponse<T = unknown> {
   readonly success: boolean;
@@ -6,7 +6,7 @@ export class ApiResponse<T = unknown> {
   constructor(
     public readonly statusCode: number,
     public readonly data?: T,
-    public readonly message = "Success"
+    public readonly message = 'Success',
   ) {
     this.success = statusCode < 400;
   }

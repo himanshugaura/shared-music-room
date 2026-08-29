@@ -3,11 +3,7 @@ export class ApiError extends Error {
   readonly success = false;
   readonly errors: string[];
 
-  constructor(
-    statusCode: number,
-    message = "Something went wrong",
-    errors: string[] = []
-  ) {
+  constructor(statusCode: number, message = 'Something went wrong', errors: string[] = []) {
     super(message);
 
     Object.setPrototypeOf(this, ApiError.prototype);
