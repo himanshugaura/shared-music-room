@@ -46,6 +46,7 @@ app.use('/api', apiRouter);
 app.use(errorHandler);
 
 const PORT = env.PORT;
+const HOST = env.HOST;
 
 const startServer = async (): Promise<void> => {
   await connectDB();
@@ -54,8 +55,8 @@ const startServer = async (): Promise<void> => {
 
   initializeSocket(httpServer);
 
-  httpServer.listen(PORT, () => {
-    logger.info(`Server running on http://localhost:${PORT}`);
+  httpServer.listen(PORT, HOST, () => {
+    logger.info(`Server running on http://${HOST}:${PORT}`);
     logger.info(`Environment: ${env.NODE_ENV}`);
   });
 

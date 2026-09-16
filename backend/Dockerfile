@@ -82,6 +82,7 @@ COPY --from=builder /app/dist ./dist
 USER node
 
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 
 EXPOSE 5000
 
