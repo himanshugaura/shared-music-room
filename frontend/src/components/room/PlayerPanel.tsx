@@ -227,6 +227,11 @@ export function PlayerPanel({
 
   const displaySec = isDragging ? dragSec : currentSec;
   const progress = duration > 0 ? displaySec / duration : 0;
+  const thumbnailUrl =
+    currentSong?.thumbnail ||
+    (currentSong?.youtubeVideoId
+      ? `https://i.ytimg.com/vi/${currentSong.youtubeVideoId}/hqdefault.jpg`
+      : null);
 
   return (
     <section
@@ -238,8 +243,8 @@ export function PlayerPanel({
         background: "#0b0f16",
       }}
     >
-      <div style={{ position: "relative", flex: 1, background: "#000", minHeight: 0 }}>
-        <div style={{ width: "100%", height: "100%", pointerEvents: "none" }}>
+      <div style={{ position: "relative", flex: 1, background: "#07090e", minHeight: 0, overflow: "hidden" }}>
+        <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, pointerEvents: "none", zIndex: 0 }}>
           <div id={playerContainerId} style={{ width: "100%", height: "100%" }} />
         </div>
 
@@ -248,6 +253,7 @@ export function PlayerPanel({
             style={{
               position: "absolute",
               inset: 0,
+              zIndex: 1,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
@@ -277,12 +283,157 @@ export function PlayerPanel({
           </div>
         )}
 
-        {buffering && currentSong && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-            <svg className="animate-spin" width="36" height="36" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
-              <path d="M12 2A10 10 0 0 1 22 12" stroke="#a3be8c" strokeWidth="3" strokeLinecap="round" />
-            </svg>
+        {currentSong && (
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "24px 20px",
+              boxSizing: "border-box",
+            }}
+          >
+            {thumbnailUrl && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  inset: "-20px",
+                  backgroundImage: `url(${thumbnailUrl})`,
+                  backgroundPosition: "center",
+                  backgroundSize: "cover",
+                  filter: "blur(48px) brightness(0.22) saturate(1.4)",
+                  transform: "scale(1.15)",
+                  pointerEvents: "none",
+                }}
+              />
+            )}
+
+            <div
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "radial-gradient(circle at center, rgba(11,15,22,0.3) 0%, rgba(11,15,22,0.85) 100%)",
+                pointerEvents: "none",
+              }}
+            />
+
+            <div
+              style={{
+                position: "relative",
+                zIndex: 2,
+                maxWidth: "min(440px, 92%)",
+                maxHeight: "min(340px, 75%)",
+                width: "auto",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "transform 0.3s ease",
+                transform: isPlaying ? "scale(1.02)" : "scale(1)",
+              }}
+            >
+              {thumbnailUrl ? (
+                <img
+                  src={thumbnailUrl}
+                  alt={currentSong.title || "Song thumbnail"}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    aspectRatio: "16 / 9",
+                    objectFit: "cover",
+                    borderRadius: 16,
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    boxShadow: isPlaying
+                      ? "0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(163, 190, 140, 0.18)"
+                      : "0 16px 40px rgba(0, 0, 0, 0.6)",
+                    display: "block",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 280,
+                    height: 160,
+                    borderRadius: 16,
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6b7a8d" strokeWidth="1.5">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+              )}
+
+              <div
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  background: isPlaying ? "rgba(163, 190, 140, 0.22)" : "rgba(0, 0, 0, 0.65)",
+                  backdropFilter: "blur(8px)",
+                  border: isPlaying ? "1px solid rgba(163, 190, 140, 0.35)" : "1px solid rgba(255, 255, 255, 0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: isPlaying ? "#a3be8c" : "#8b949e",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {isPlaying ? (
+                  <>
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: "#a3be8c",
+                        boxShadow: "0 0 8px #a3be8c",
+                      }}
+                    />
+                    <span>PLAYING</span>
+                  </>
+                ) : (
+                  <span>PAUSED</span>
+                )}
+              </div>
+            </div>
+
+            {buffering && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 3,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0, 0, 0, 0.4)",
+                  backdropFilter: "blur(4px)",
+                  pointerEvents: "none",
+                }}
+              >
+                <svg className="animate-spin" width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.1)" strokeWidth="3" />
+                  <path d="M12 2A10 10 0 0 1 22 12" stroke="#a3be8c" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              </div>
+            )}
           </div>
         )}
       </div>

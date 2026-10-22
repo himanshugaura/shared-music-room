@@ -443,7 +443,14 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
 
         {selectedVideo && (
           <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-            <div style={{ position: "relative", aspectRatio: "16/9", background: "#000", flexShrink: 0 }}>
+            <div style={{ position: "relative", aspectRatio: "16/9", background: "#000", flexShrink: 0, overflow: "hidden" }}>
+              {selectedVideo.thumbnail && (
+                <img
+                  src={selectedVideo.thumbnail}
+                  alt={selectedVideo.title || "Preview"}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                />
+              )}
               {previewLoading && (
                 <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", zIndex: 1 }}>
                   <svg className="animate-spin" width="28" height="28" viewBox="0 0 24 24" fill="none">
@@ -452,7 +459,7 @@ export function AddSongModal({ roomId, open, onClose }: Props) {
                   </svg>
                 </div>
               )}
-              <div ref={previewHostRef} style={{ width: "100%", height: "100%" }} />
+              <div ref={previewHostRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, pointerEvents: "none" }} />
             </div>
 
             <div style={{ padding: "14px 20px 0" }}>
